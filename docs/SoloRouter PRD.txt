@@ -1,0 +1,448 @@
+Here’s a rewritten PRD aligned with a **single-user, open-source, local app for personal use** (still leveraging OpenRouter, but entirely user-hosted and privacy-focused).
+
+---
+
+# Personal OpenRouter Chat – Product Requirements Document
+
+**Version:** 2.0.0
+**Date:** November 18, 2025
+**Status:** Draft – Personal OSS App
+**Project Codename:** SoloRouter Chat
+
+---
+
+## Document Control
+
+| **Attribute**               | **Value**                                     |
+| --------------------------- | --------------------------------------------- |
+| **Authors**                 | PRD Generation Agent, Bret (Context Engineer) |
+| **Intended User**           | Single end-user (self-hosting)                |
+| **Scope**                   | Personal, local-first chat app                |
+| **API Provider (Optional)** | OpenRouter (user’s own key)                   |
+| **Distribution**            | Open source (MIT or similar)                  |
+
+---
+
+## Executive Summary
+
+### Vision Statement
+
+Create a **simple, privacy-respecting, single-user chat interface** that runs locally and gives one person access to many AI models (via OpenRouter or other endpoints) in a **clean, hackable, open-source app**. No multi-tenant complexity, no servers to manage—just a local UI the user can trust and tweak.
+
+### Use Case Focus
+
+* **Primary:** Personal assistant / coding helper / note-taker for a single user.
+* **Form factor:** Local web app (served by a tiny dev server) or desktop wrapper (Electron/Tauri) — no centralized backend.
+* **Data ownership:** All conversation history lives on the user’s machine (localStorage or local file). No database, no cloud backend.
+
+### Strategic Positioning (for a Solo User)
+
+We’re **not** building a SaaS product or team tool. The app is:
+
+* ✅ **Self-hosted & local** – user runs it on their own machine.
+* ✅ **Zero backend infrastructure** – frontend talks directly to OpenRouter or a local LLM endpoint.
+* ✅ **Hackable** – clean React + TypeScript code a single developer can grok quickly.
+* ✅ **Privacy-first** – conversations never leave the device except for model API calls the user explicitly configures.
+
+### Explicit Non-Goals (v1.0 – Personal Scope)
+
+* ❌ Multi-user or team accounts
+* ❌ Admin dashboards, org management, billing
+* ❌ Enterprise auth (OAuth, SAML, SSO)
+* ❌ Uptime SLAs, monitoring, on-call, DevOps concerns
+
+The app should feel like “**a nicely built personal text editor, but for AI chat**”.
+
+---
+
+## Problem Statement (Personal Use)
+
+**Pain Points for an Individual User:**
+
+1. **Single-provider lock-in** – Official apps tie you to one vendor and one model at a time.
+2. **Data & privacy** – User wants control over where chat data is stored and which calls go to the cloud.
+3. **Overkill complexity** – Many open-source projects aim at multi-tenant server deployments, which is unnecessary for a solo user.
+4. **Tinkering barrier** – User wants a **small, understandable codebase** to hack, not a monolith.
+
+**Goals for This App:**
+
+* Easy to run locally (`pnpm install && pnpm dev`).
+* Easy to point at:
+
+  * OpenRouter with a user-provided API key, and/or
+  * Local model endpoints (future-friendly design).
+* No backend services to deploy or maintain.
+
+---
+
+## Technical Architecture (Local & Single-User)
+
+### System Overview
+
+* **Frontend:** React + TypeScript single-page app
+* **Runtime:** Local browser (or Electron/Tauri wrapper)
+* **Data Store:** Browser `localStorage` (conversations & settings) + `sessionStorage` (API key)
+* **Model Provider:**
+
+  * Default: OpenRouter HTTPS endpoint
+  * Architecture keeps a “provider” abstraction so local endpoints can be added later (e.g. Ollama at `http://localhost:11434`)
+
+### Architecture Diagram
+
+```mermaid
+graph TB
+    User[User (Single Person)] -->|Local Access| Browser[Local Browser / Desktop Wrapper]
+
+    Browser -->|HTTPS (optional)| OpenRouter[OpenRouter API]
+    Browser -->|Read/Write| LocalStorage[(localStorage - Conversations & Settings)]
+    Browser -->|Session Only| SessionStorage[(sessionStorage - API Key)]
+
+    subgraph "User's Machine"
+        Browser
+        LocalStorage
+        SessionStorage
+    end
+
+    subgraph "External (Optional)"
+        OpenRouter
+    end
+```
+
+**Key Property:** App works as a purely local UI with **no app-specific backend**. All external calls are initiated directly by the client with the user’s credentials.
+
+---
+
+## Technology Stack
+
+**Frontend Stack:**
+
+```yaml
+framework: React 18.2+
+language: TypeScript 5.2+
+build_tool: Vite 5.0+
+styling: Tailwind CSS 3.4+
+state_management: Zustand 4.5+
+markdown: marked 11.0+
+syntax_highlighting: highlight.js 11.9+
+security: DOMPurify 3.0+
+testing: Vitest 1.0+ (lightweight, optional but encouraged)
+```
+
+**Key Dependencies:**
+
+```json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zustand": "^4.5.0",
+    "marked": "^11.0.0",
+    "highlight.js": "^11.9.0",
+    "dompurify": "^3.0.0",
+    "@tanstack/react-virtual": "^3.0.0",
+    "event-source-polyfill": "^1.0.31"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.2.0",
+    "vitest": "^1.0.0",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0"
+  }
+}
+```
+
+---
+
+## Functional Requirements (Personal MVP)
+
+### FR-001: Real-Time Streaming Response Display
+
+**Priority:** CRITICAL
+**Scope:** Single-user, single-session streaming
+
+**Spec:**
+
+* Use OpenRouter SSE streaming (or equivalent provider) to show assistant responses incrementally.
+* Show partial response as it arrives; user sees text “typing out”.
+* Handle cancellation gracefully (Stop button).
+
+**Acceptance Criteria (Adapted for Single User):**
+
+* First tokens appear within ~500ms for a typical request (network permitting).
+* Streaming continues without blocking UI.
+* If network fails or the user’s key is invalid:
+
+  * The partial text stays visible.
+  * A clear error message appears.
+
+Security note: streamed content is always passed through the Markdown + DOMPurify pipeline before display.
+
+---
+
+### FR-002: Local Conversation Persistence
+
+**Priority:** CRITICAL
+
+Store all chats **locally** in the browser; no cloud sync built-in.
+
+**Data Model:**
+
+```typescript
+interface Conversation {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: number;
+  updatedAt: number;
+  model: string;
+  settings: {
+    temperature: number;
+    maxTokens: number;
+    systemPrompt: string | null;
+  };
+  metadata?: {
+    totalTokens?: number;
+    totalCost?: number;
+    messageCount: number;
+  };
+}
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: number;
+  model?: string;
+  tokenCount?: number;
+  error?: boolean;
+}
+```
+
+**Storage Strategy:**
+
+* Storage key: `solo_router_conversations_v1`
+* Debounced auto-save (every 1–2 seconds during changes).
+* If JSON parse fails on load, reset to a safe default and show a one-time warning.
+
+Optional extension (Phase 2): Export/import conversations as a JSON file for backup between devices.
+
+---
+
+### FR-003: Markdown Rendering + Code Highlighting (Safe)
+
+**Priority:** HIGH
+
+* Support GitHub-style Markdown in assistant responses.
+* Highlight fenced code blocks with `highlight.js`.
+* Provide “Copy” button per code block.
+
+**Security:**
+
+```typescript
+const html = marked.parse(content);
+const sanitized = DOMPurify.sanitize(html, {
+  ALLOWED_TAGS: [
+    'p','br','strong','em','code','pre','a',
+    'ul','ol','li','h1','h2','h3','h4','h5','h6',
+    'blockquote','table','thead','tbody','tr','th','td'
+  ],
+  ALLOWED_ATTR: ['href','class','target','rel'],
+  FORBID_TAGS: ['script','iframe','object','embed','form'],
+  FORBID_ATTR: ['onclick','onerror','onload']
+});
+```
+
+All rendered content should go through this pipeline so a user doesn’t accidentally render dangerous HTML from a model response.
+
+---
+
+### FR-004: Model Selection & Basic Configuration
+
+**Priority:** HIGH
+
+In a **single-user** context, model selection is about convenience and cost awareness for that one person.
+
+**Requirements:**
+
+* Fetch available models from OpenRouter (`/api/v1/models`) when a valid API key is set, or use a static list as a fallback.
+* Provide a dropdown filterable by name/provider.
+* Display short hints like:
+
+  * **“claude-3.5-sonnet – high quality, moderate cost”**
+  * **“gpt-4o-mini – cheaper, fast”**
+* Remember last-selected model in local settings.
+
+**Local Endpoint Readiness (Design Only in v1):**
+
+* Abstract provider interface so a future `local-http` provider (e.g. Ollama) can be plugged in without rewriting the UI.
+
+---
+
+### Extended “Nice-to-Have” Features (Personal Scope)
+
+These are **not required** for the first usable version, but are good targets once the core is stable:
+
+* **FR-005:** Message actions (Copy, Regenerate, Edit & Resend)
+* **FR-006:** Export/Import conversations as JSON files
+* **FR-007:** Light/Dark theme toggle with local preference
+* **FR-008:** Mobile-friendly layout (vertical-first, responsive)
+* **FR-009:** Keyboard shortcuts (e.g., `Ctrl+Enter` to send, `/` to focus input)
+* **FR-010:** Simple settings panel (temperature, max tokens, default system prompt)
+
+---
+
+## Minimal Delivery Roadmap (For a Solo Dev)
+
+> Time ranges are illustrative, not strict.
+
+### Phase 1: Usable Core (Weeks 1–2)
+
+Goal: “I can talk to a model from my laptop in a nice UI.”
+
+* [ ] Project setup (Vite + React + TS + Tailwind)
+* [ ] Simple chat layout (sidebar + message list + input)
+* [ ] API key input (stored in `sessionStorage`)
+* [ ] Basic non-streaming request to OpenRouter
+* [ ] Show responses plainly (no markdown yet)
+
+### Phase 2: Streaming & Persistence (Weeks 3–4)
+
+* [ ] FR-001: SSE streaming with live token display
+* [ ] FR-002: Conversation persistence in `localStorage`
+* [ ] Conversation list in sidebar (create/rename/delete)
+
+### Phase 3: Polish for Daily Use (Weeks 5–6+)
+
+* [ ] FR-003: Markdown + code highlighting + copy buttons
+* [ ] FR-004: Model selection & settings remembered
+* [ ] Basic error states (invalid key, rate limit, network)
+* [ ] Simple theme toggle (optional)
+
+At the end of Phase 3, the app should be **good enough to replace a browser tab** to your usual AI tool for many tasks.
+
+---
+
+## Non-Functional Requirements (Personal Context)
+
+### Performance
+
+Rough targets for a single user on a typical laptop:
+
+| **Metric**          | **Target**                                    |
+| ------------------- | --------------------------------------------- |
+| App load (cold)     | < 2s in dev build, < 1.5s in production build |
+| Initial UI ready    | No visible layout jank                        |
+| Streaming display   | No noticeable stutter during typing           |
+| LocalStorage writes | Fast enough not to block UI (debounced)       |
+
+No server-side scaling or multi-user throughput requirements.
+
+### Security & Privacy
+
+Even for personal use, the app must avoid common foot-guns:
+
+* Store **API key only on the client**, in `sessionStorage` or memory (never log it).
+* Never send conversation data to any backend other than the configured model provider.
+* Use `DOMPurify` for all HTML rendering.
+* Recommend running over `https://` when deployed remotely, or `http://localhost` for purely local use.
+
+No centralized logging, no telemetry by default.
+
+---
+
+## Simple Success Criteria (For One Person)
+
+You should be able to say “yes” to:
+
+1. **Setup:**
+
+   * Clone repo, run `pnpm install && pnpm dev`, open `http://localhost:5173` → working app in **<15 minutes**.
+2. **Daily Use:**
+
+   * Use the app as a **primary AI chat client** for at least a week without major annoyances.
+3. **Stability:**
+
+   * No data loss across browser restarts (conversations remain).
+   * No obvious security holes like XSS from model output.
+4. **Hackability:**
+
+   * A reasonably experienced JS/TS dev can understand the core code structure in **<1 day** and make small changes comfortably.
+
+---
+
+## Risk Management (Personal)
+
+Top risks for a solo, local project:
+
+* **R-001: API Provider Changes (OpenRouter)**
+
+  * *Mitigation:* Keep provider interface small and documented; add graceful error messages; keep versions loose but test occasionally.
+* **R-002: Browser Storage Corruption / Quota**
+
+  * *Mitigation:* Handle JSON parse errors; allow manual export; keep conversations compact.
+* **R-003: Over-scoping**
+
+  * *Mitigation:* Keep v1 strictly to FR-001–FR-004; treat everything else as “later / maybe”.
+
+No operational or organizational risks, since this is for single-user local use.
+
+---
+
+## Development Workflow (Lightweight)
+
+A simple, solo-friendly workflow:
+
+```bash
+# Install once
+pnpm install
+
+# During development
+pnpm dev
+
+# Before pushing / releasing
+pnpm lint
+pnpm type-check
+pnpm test --run
+```
+
+* Branch structure is optional; `main` plus occasional feature branches is enough.
+* Code review checklists are informal (self-check).
+
+---
+
+## Appendix: OpenRouter Usage (Optional but Supported)
+
+**Base URL:** `https://openrouter.ai/api/v1`
+
+**Key points for personal use:**
+
+* User provides their own API key via a local settings panel.
+* All requests are made **directly** from the client to OpenRouter.
+* No proxy server or shared credentials required.
+
+Example streaming call (unchanged conceptually):
+
+```bash
+POST /chat/completions
+Authorization: Bearer {API_KEY}
+Content-Type: application/json
+
+{
+  "model": "anthropic/claude-3-sonnet",
+  "messages": [{ "role": "user", "content": "Hello" }],
+  "stream": true
+}
+```
+
+Returned as SSE events:
+
+```text
+data: {"choices":[{"delta":{"content":"Hello"}}]}
+data: [DONE]
+```
+
+---
+
+**END – Personal Local App PRD**
