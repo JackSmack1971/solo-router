@@ -101,7 +101,7 @@ function createNewConversation(title: string, settings: AppSettings): Conversati
 /**
  * Debounce helper for saving to storage
  */
-let saveTimeout: NodeJS.Timeout | null = null;
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 function debouncedSave(fn: () => void, delay = 500): void {
   if (saveTimeout) {
@@ -288,8 +288,6 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     const {
       getActiveConversation,
       addMessage,
-      updateMessage,
-      settings,
     } = get();
 
     const activeConv = getActiveConversation();
@@ -383,7 +381,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
                       : msg
                   ),
                   metadata: {
-                    ...conv.metadata,
+                    messageCount: conv.metadata?.messageCount || conv.messages.length,
                     totalTokens:
                       (conv.metadata?.totalTokens || 0) + (usage.totalTokens || 0),
                   },

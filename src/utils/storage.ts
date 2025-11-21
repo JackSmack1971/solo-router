@@ -175,7 +175,7 @@ export function clearSettings(): void {
 export function saveApiKey(key: string): void {
   try {
     sessionStorage.setItem(API_KEY_SESSION_KEY, key);
-  } catch (err) {
+  } catch {
     console.error('[Storage] Failed to save API key (will not be logged)');
   }
 }
@@ -187,7 +187,7 @@ export function saveApiKey(key: string): void {
 export function getApiKey(): string | null {
   try {
     return sessionStorage.getItem(API_KEY_SESSION_KEY);
-  } catch (err) {
+  } catch {
     console.error('[Storage] Failed to retrieve API key');
     return null;
   }
@@ -200,7 +200,7 @@ export function getApiKey(): string | null {
 export function clearApiKey(): void {
   try {
     sessionStorage.removeItem(API_KEY_SESSION_KEY);
-  } catch (err) {
+  } catch {
     console.error('[Storage] Failed to clear API key');
   }
 }
