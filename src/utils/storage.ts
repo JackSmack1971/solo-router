@@ -246,3 +246,136 @@ export function isStorageNearLimit(): boolean {
   const WARN_THRESHOLD = 4 * 1024 * 1024; // 4MB
   return size > WARN_THRESHOLD;
 }
+
+// ============================================================================
+// Export / Import (FR-006)
+// ============================================================================
+
+/**
+ * Export format for backup data
+ */
+export interface ExportData {
+  version: string;
+  exportedAt: number;
+  conversations: Conversation[];
+  settings: AppSettings;
+}
+
+/**
+ * Export all conversations and settings to a JSON file
+ * Downloads the file with name: solo-router-backup.json
+ */
+export function exportData(): void {
+  try {
+    const conversations = loadConversations();
+    const settings = loadSettings();
+
+    const exportData: ExportData = {
+      version: '1.0',
+      exportedAt: Date.now(),
+      conversations,
+      settings,
+    };
+
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    // Create a temporary link element and trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `solo-router-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Clean up the URL object
+    URL.revokeObjectURL(url);
+
+    console.log('[Storage] Data exported successfully');
+  } catch (err) {
+    console.error('[Storage] Failed to export data:', err);
+    throw new Error('Failed to export data. Please try again.');
+  }
+}
+
+/**
+ * Import conversations and settings from a JSON file
+ * Merges imported conversations with existing ones
+ * @param file - The JSON file to import
+ * @param mode - 'merge' to keep existing data, 'replace' to overwrite
+ */
+export async function importData(
+  file: File,
+  mode: 'merge' | 'replace' = 'merge'
+): Promise<{ conversations: number; settings: boolean }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        if (!text) {
+          throw new Error('File is empty');
+        }
+
+        const importData = JSON.parse(text) as ExportData;
+
+        // Validate import data structure
+        if (
+          !importData.version ||
+          !Array.isArray(importData.conversations) ||
+          typeof importData.settings !== 'object'
+        ) {
+          throw new Error('Invalid backup file format');
+        }
+
+        // Import settings
+        const mergedSettings = {
+          ...DEFAULT_SETTINGS,
+          ...importData.settings,
+        };
+        saveSettings(mergedSettings);
+
+        // Import conversations
+        let mergedConversations: Conversation[];
+
+        if (mode === 'replace') {
+          mergedConversations = importData.conversations;
+        } else {
+          // Merge mode: combine with existing conversations
+          const existing = loadConversations();
+          const existingIds = new Set(existing.map((c) => c.id));
+
+          // Filter out duplicates by ID
+          const newConversations = importData.conversations.filter(
+            (c) => !existingIds.has(c.id)
+          );
+
+          mergedConversations = [...existing, ...newConversations];
+        }
+
+        saveConversations(mergedConversations);
+
+        console.log('[Storage] Data imported successfully');
+        resolve({
+          conversations: importData.conversations.length,
+          settings: true,
+        });
+      } catch (err) {
+        console.error('[Storage] Failed to import data:', err);
+        reject(
+          new Error(
+            err instanceof Error ? err.message : 'Failed to parse backup file'
+          )
+        );
+      }
+    };
+
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'));
+    };
+
+    reader.readAsText(file);
+  });
+}

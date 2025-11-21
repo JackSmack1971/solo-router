@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, StopCircle, AlertCircle } from 'lucide-react';
+import { Send, StopCircle, AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { Markdown } from './Markdown';
 import type { Message } from '../types';
@@ -13,12 +13,36 @@ import type { Message } from '../types';
 /**
  * Individual message bubble component
  */
-const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
+interface MessageBubbleProps {
+  message: Message;
+  isLastAssistantMessage?: boolean;
+  onCopy?: () => void;
+  onRegenerate?: () => void;
+}
+
+const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  isLastAssistantMessage = false,
+  onCopy,
+  onRegenerate,
+}) => {
+  const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const isError = message.error;
 
+  /**
+   * Handle copy to clipboard
+   */
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+    onCopy?.();
+  };
+
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 group`}>
       <div
         className={`max-w-[80%] rounded-lg px-4 py-3 ${
           isUser
@@ -26,7 +50,7 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
             : isError
             ? 'bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700'
             : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-        }`}
+        } relative`}
       >
         {/* Message metadata */}
         <div className="flex items-center gap-2 mb-1">
@@ -49,6 +73,31 @@ const MessageBubble: React.FC<{ message: Message }> = ({ message }) => {
         {message.tokenCount && (
           <div className="mt-2 text-xs opacity-60">
             {message.tokenCount.toLocaleString()} tokens
+          </div>
+        )}
+
+        {/* Action buttons for assistant messages (FR-005) */}
+        {!isUser && (
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+              aria-label="Copy message"
+            >
+              <Copy size={14} />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+
+            {isLastAssistantMessage && onRegenerate && (
+              <button
+                onClick={onRegenerate}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                aria-label="Regenerate response"
+              >
+                <RefreshCw size={14} />
+                Regenerate
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -82,6 +131,7 @@ export const ChatInterface: React.FC = () => {
   const isGenerating = useChatStore((state) => state.isGenerating);
   const sendMessage = useChatStore((state) => state.sendMessage);
   const stopGeneration = useChatStore((state) => state.stopGeneration);
+  const deleteMessage = useChatStore((state) => state.deleteMessage);
 
   /**
    * Auto-scroll to bottom when new messages arrive
@@ -120,13 +170,70 @@ export const ChatInterface: React.FC = () => {
   };
 
   /**
-   * Handle Enter key (Shift+Enter for new line)
+   * Handle regenerate for the last assistant message (FR-005)
+   */
+  const handleRegenerate = async () => {
+    if (!activeConversation || isGenerating) {
+      return;
+    }
+
+    const messages = activeConversation.messages;
+
+    // Find the last assistant message and the user message before it
+    let lastAssistantIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        lastAssistantIndex = i;
+        break;
+      }
+    }
+
+    if (lastAssistantIndex === -1) {
+      return;
+    }
+
+    // Find the last user message before the assistant message
+    let lastUserMessage = '';
+    for (let i = lastAssistantIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        lastUserMessage = messages[i].content;
+        break;
+      }
+    }
+
+    if (!lastUserMessage) {
+      return;
+    }
+
+    // Delete the last assistant message
+    deleteMessage(activeConversation.id, messages[lastAssistantIndex].id);
+
+    // Re-send the user message
+    await sendMessage(lastUserMessage);
+  };
+
+  /**
+   * Handle keyboard shortcuts (FR-009)
+   * - Enter: send message
+   * - Shift+Enter: new line
+   * - Ctrl+Enter (or Cmd+Enter): send message
    */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Ctrl+Enter or Cmd+Enter to send
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      handleSend();
+      return;
+    }
+
+    // Enter without Shift to send (original behavior)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+      return;
     }
+
+    // Shift+Enter allows normal line break (handled by textarea by default)
   };
 
   /**
@@ -156,6 +263,15 @@ export const ChatInterface: React.FC = () => {
   const messages = activeConversation.messages;
   const hasMessages = messages.length > 0;
 
+  // Find the last assistant message index
+  let lastAssistantMessageIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') {
+      lastAssistantMessageIndex = i;
+      break;
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
       {/* Header */}
@@ -174,8 +290,15 @@ export const ChatInterface: React.FC = () => {
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {hasMessages ? (
           <>
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
+            {messages.map((message, index) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isLastAssistantMessage={
+                  message.role === 'assistant' && index === lastAssistantMessageIndex
+                }
+                onRegenerate={handleRegenerate}
+              />
             ))}
             <div ref={messagesEndRef} />
           </>
@@ -222,9 +345,9 @@ export const ChatInterface: React.FC = () => {
           )}
         </div>
 
-        {/* Helper text */}
+        {/* Helper text (FR-009) */}
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          Press Enter to send, Shift+Enter for new line
+          Press Enter or Ctrl+Enter to send, Shift+Enter for new line
         </p>
       </div>
     </div>
