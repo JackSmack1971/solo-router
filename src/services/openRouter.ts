@@ -26,13 +26,14 @@ export const MODELS_PATH = '/models';
  * Custom error class for API-related errors
  */
 export class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-    public body?: unknown
-  ) {
+  status: number;
+  body?: unknown;
+
+  constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
   }
 }
 
@@ -278,7 +279,13 @@ export class OpenRouterProvider implements ChatProvider {
       }
 
       // Transform API response to our ModelSummary format
-      return data.data.map((model: any) => ({
+      return data.data.map((model: {
+        id: string;
+        name?: string;
+        description?: string;
+        context_length?: number;
+        pricing?: { prompt: string; completion: string };
+      }) => ({
         id: model.id,
         name: model.name || model.id,
         description: model.description,
