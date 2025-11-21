@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Eye, EyeOff } from 'lucide-react';
 import { getApiKey, saveApiKey, clearApiKey } from '../utils/storage';
+import { useChatStore } from '../store/chatStore';
 
 interface SettingsModalProps {
   /**
@@ -20,14 +21,33 @@ interface SettingsModalProps {
 }
 
 /**
+ * Available models for selection
+ */
+const AVAILABLE_MODELS = [
+  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
+  { id: 'openai/gpt-4o', name: 'GPT-4o' },
+  { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5' },
+];
+
+/**
  * Settings modal component
  * Handles OpenRouter API key management (stored in sessionStorage only)
+ * and application settings (model, temperature, system prompt)
  */
 export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
-  // Initialize state from sessionStorage
+  // API Key state
   const [apiKey, setApiKey] = useState(() => getApiKey() || '');
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+
+  // App settings from store
+  const settings = useChatStore((state) => state.settings);
+  const updateSettings = useChatStore((state) => state.updateSettings);
+
+  // Local state for settings
+  const [selectedModel, setSelectedModel] = useState(settings.defaultModel || AVAILABLE_MODELS[0].id);
+  const [temperature, setTemperature] = useState(settings.temperature);
+  const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt || '');
 
   // Reset state when modal opens
   useEffect(() => {
@@ -37,30 +57,43 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         const key = getApiKey();
         setApiKey(key || '');
         setIsSaved(false);
+        // Update local settings from store
+        setSelectedModel(settings.defaultModel || AVAILABLE_MODELS[0].id);
+        setTemperature(settings.temperature);
+        setSystemPrompt(settings.systemPrompt || '');
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, settings]);
 
   /**
    * Handle save button click
    */
   const handleSave = () => {
+    // Save API key if provided
     if (apiKey.trim()) {
       saveApiKey(apiKey.trim());
-      setIsSaved(true);
-
-      // Auto-close after a short delay
-      setTimeout(() => {
-        onClose();
-      }, 1000);
     }
+
+    // Save app settings
+    updateSettings({
+      defaultModel: selectedModel,
+      temperature,
+      systemPrompt: systemPrompt.trim() || null,
+    });
+
+    setIsSaved(true);
+
+    // Auto-close after a short delay
+    setTimeout(() => {
+      onClose();
+    }, 1000);
   };
 
   /**
-   * Handle clear button click
+   * Handle clear API key button click
    */
-  const handleClear = () => {
+  const handleClearApiKey = () => {
     clearApiKey();
     setApiKey('');
     setIsSaved(false);
@@ -98,7 +131,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           {/* API Key Section */}
           <div>
             <label
@@ -143,11 +176,88 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             </p>
           </div>
 
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-700" />
+
+          {/* Model Selection */}
+          <div>
+            <label
+              htmlFor="model-select"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Default Model
+            </label>
+            <select
+              id="model-select"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+            >
+              {AVAILABLE_MODELS.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              The model to use for new conversations.
+            </p>
+          </div>
+
+          {/* Temperature Slider */}
+          <div>
+            <label
+              htmlFor="temperature"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              Temperature: {temperature.toFixed(1)}
+            </label>
+            <input
+              id="temperature"
+              type="range"
+              min="0"
+              max="2"
+              step="0.1"
+              value={temperature}
+              onChange={(e) => setTemperature(parseFloat(e.target.value))}
+              className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+            />
+            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <span>Precise (0.0)</span>
+              <span>Balanced (1.0)</span>
+              <span>Creative (2.0)</span>
+            </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Controls randomness in responses. Lower values are more focused and deterministic.
+            </p>
+          </div>
+
+          {/* System Prompt */}
+          <div>
+            <label
+              htmlFor="system-prompt"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+            >
+              System Prompt (Optional)
+            </label>
+            <textarea
+              id="system-prompt"
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+              placeholder="You are a helpful assistant..."
+              rows={4}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 resize-none"
+            />
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Instructions that set the assistant's behavior and personality.
+            </p>
+          </div>
+
           {/* Success Message */}
           {isSaved && (
             <div className="p-3 bg-green-100 dark:bg-green-900 border border-green-300 dark:border-green-700 rounded-md">
               <p className="text-sm text-green-800 dark:text-green-200">
-                API key saved successfully!
+                Settings saved successfully!
               </p>
             </div>
           )}
@@ -156,15 +266,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 p-4 border-t border-gray-200 dark:border-gray-700">
           <button
-            onClick={handleClear}
+            onClick={handleClearApiKey}
             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
           >
-            Clear
+            Clear API Key
           </button>
           <button
             onClick={handleSave}
-            disabled={!apiKey.trim()}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed rounded-md transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors"
           >
             Save
           </button>

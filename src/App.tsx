@@ -9,6 +9,8 @@ import { Plus, Trash2, Settings, MessageSquare, Menu, X } from 'lucide-react';
 import { useChatStore } from './store/chatStore';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
+import { ThemeToggle } from './components/ThemeToggle';
+import { useTheme } from './hooks/useTheme';
 import { hasApiKey } from './utils/storage';
 
 /**
@@ -66,6 +68,9 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
+
+  // Initialize theme
+  useTheme();
 
   // Connect to store
   const conversations = useChatStore((state) => state.conversations);
@@ -184,14 +189,17 @@ function App() {
           </div>
 
           {/* Sidebar Footer */}
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setIsSettingsOpen(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg transition-colors font-medium"
-            >
-              <Settings size={18} />
-              Settings
-            </button>
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsSettingsOpen(true)}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg transition-colors font-medium"
+              >
+                <Settings size={18} />
+                Settings
+              </button>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
       </div>
