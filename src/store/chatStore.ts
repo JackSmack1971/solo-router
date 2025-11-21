@@ -25,6 +25,7 @@ interface ChatStore {
   settings: AppSettings;
   isGenerating: boolean;
   currentAbortController: AbortController | null;
+  error: string | null;
 
   // Conversation Management
   createConversation: (title?: string) => string;
@@ -44,6 +45,10 @@ interface ChatStore {
 
   // Settings Management
   updateSettings: (settings: Partial<AppSettings>) => void;
+
+  // Error Management
+  setError: (error: string | null) => void;
+  clearError: () => void;
 
   // Persistence
   loadFromStorage: () => void;
@@ -120,6 +125,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   settings: { ...DEFAULT_SETTINGS },
   isGenerating: false,
   currentAbortController: null,
+  error: null,
 
   // ========================================================================
   // Conversation Management
@@ -401,6 +407,24 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         onError: (error: Error) => {
           console.error('[ChatStore] Generation error:', error);
 
+          // Parse error message to detect specific error codes
+          let errorMessage = error.message || 'Failed to generate response';
+          const errorStr = error.message?.toLowerCase() || '';
+
+          // Detect specific error codes (R-001)
+          if (errorStr.includes('401') || errorStr.includes('unauthorized') || errorStr.includes('invalid api key')) {
+            errorMessage = 'Invalid API Key. Please check your OpenRouter API key in Settings.';
+          } else if (errorStr.includes('402') || errorStr.includes('insufficient credits') || errorStr.includes('no credits')) {
+            errorMessage = 'Insufficient Credits. Your OpenRouter account has run out of credits.';
+          } else if (errorStr.includes('429') || errorStr.includes('rate limit')) {
+            errorMessage = 'Rate Limit Exceeded. Please wait a moment before trying again.';
+          } else if (errorStr.includes('api key') || errorStr.includes('missing api key')) {
+            errorMessage = 'Missing API Key. Please set your OpenRouter API key in Settings.';
+          }
+
+          // Set global error state
+          get().setError(errorMessage);
+
           // Mark the message as having an error
           set((state) => ({
             conversations: state.conversations.map((conv) =>
@@ -414,7 +438,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
                             error: true,
                             content:
                               msg.content ||
-                              `Error: ${error.message || 'Failed to generate response'}`,
+                              `Error: ${errorMessage}`,
                           }
                         : msg
                     ),
@@ -472,6 +496,18 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   },
 
   // ========================================================================
+  // Error Management
+  // ========================================================================
+
+  setError: (error: string | null) => {
+    set({ error });
+  },
+
+  clearError: () => {
+    set({ error: null });
+  },
+
+  // ========================================================================
   // Persistence
   // ========================================================================
 
@@ -505,6 +541,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       settings: { ...DEFAULT_SETTINGS },
       isGenerating: false,
       currentAbortController: null,
+      error: null,
     });
 
     // Clear storage

@@ -170,11 +170,20 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Sidebar */}
+      {/* Mobile Sidebar Overlay - FR-008 */}
+      {isSidebarOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => setIsSidebarOpen(false)}
+          aria-label="Close sidebar overlay"
+        />
+      )}
+
+      {/* Sidebar - FR-008 Mobile Responsive */}
       <div
         className={`${
-          isSidebarOpen ? 'w-64' : 'w-0'
-        } flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 overflow-hidden`}
+          isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:translate-x-0 fixed md:static inset-y-0 left-0 z-50 md:z-auto w-64 flex-shrink-0 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transition-transform duration-300 md:transition-none`}
       >
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
@@ -185,7 +194,7 @@ function App() {
               </h1>
               <button
                 onClick={() => setIsSidebarOpen(false)}
-                className="lg:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                className="md:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 aria-label="Close sidebar"
               >
                 <X size={20} />
@@ -296,25 +305,23 @@ function App() {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Mobile Header */}
-        {!isSidebarOpen && (
-          <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              aria-label="Open sidebar"
-            >
-              <Menu size={24} />
-            </button>
-            <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">
-              SoloRouter
-            </h1>
-          </div>
-        )}
+        {/* Mobile Header - FR-008 */}
+        <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            aria-label="Open sidebar"
+          >
+            <Menu size={24} />
+          </button>
+          <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+            SoloRouter
+          </h1>
+        </div>
 
         {/* Chat Interface */}
         <div className="flex-1 overflow-hidden">
-          <ChatInterface />
+          <ChatInterface onOpenSettings={() => setIsSettingsOpen(true)} />
         </div>
       </div>
 
@@ -323,14 +330,6 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
-
-      {/* Mobile Sidebar Overlay */}
-      {isSidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
     </div>
   );
 }

@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, StopCircle, AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import { Send, StopCircle, AlertCircle, Copy, RefreshCw, X, Settings } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { Markdown } from './Markdown';
 import type { Message } from '../types';
@@ -119,9 +119,16 @@ const EmptyState: React.FC = () => (
 );
 
 /**
+ * Main chat interface component props
+ */
+interface ChatInterfaceProps {
+  onOpenSettings?: () => void;
+}
+
+/**
  * Main chat interface component
  */
-export const ChatInterface: React.FC = () => {
+export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -132,6 +139,8 @@ export const ChatInterface: React.FC = () => {
   const sendMessage = useChatStore((state) => state.sendMessage);
   const stopGeneration = useChatStore((state) => state.stopGeneration);
   const deleteMessage = useChatStore((state) => state.deleteMessage);
+  const error = useChatStore((state) => state.error);
+  const clearError = useChatStore((state) => state.clearError);
 
   /**
    * Auto-scroll to bottom when new messages arrive
@@ -286,6 +295,38 @@ export const ChatInterface: React.FC = () => {
         </div>
       </div>
 
+      {/* Error Banner - R-001 */}
+      {error && (
+        <div className="mx-6 mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-3">
+          <AlertCircle className="flex-shrink-0 text-red-600 dark:text-red-400 mt-0.5" size={20} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-red-800 dark:text-red-200 font-medium mb-1">
+              Error
+            </p>
+            <p className="text-sm text-red-700 dark:text-red-300">
+              {error}
+            </p>
+            {/* Show settings button if error is about API key */}
+            {(error.toLowerCase().includes('api key') || error.toLowerCase().includes('missing')) && onOpenSettings && (
+              <button
+                onClick={onOpenSettings}
+                className="mt-2 flex items-center gap-1 text-sm text-red-800 dark:text-red-200 hover:text-red-900 dark:hover:text-red-100 font-medium underline"
+              >
+                <Settings size={14} />
+                Open Settings
+              </button>
+            )}
+          </div>
+          <button
+            onClick={clearError}
+            className="flex-shrink-0 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-200"
+            aria-label="Dismiss error"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         {hasMessages ? (
@@ -300,6 +341,23 @@ export const ChatInterface: React.FC = () => {
                 onRegenerate={handleRegenerate}
               />
             ))}
+
+            {/* Loading Indicator - Phase 6 */}
+            {isGenerating && messages[messages.length - 1]?.role === 'user' && (
+              <div className="flex justify-start mb-4">
+                <div className="max-w-[80%] rounded-lg px-4 py-3 bg-gray-100 dark:bg-gray-800">
+                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></span>
+                      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></span>
+                      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></span>
+                    </div>
+                    <span className="text-sm">Waiting for response...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div ref={messagesEndRef} />
           </>
         ) : (
@@ -307,9 +365,9 @@ export const ChatInterface: React.FC = () => {
         )}
       </div>
 
-      {/* Input Area */}
-      <div className="border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-6 py-4">
-        <div className="flex items-end gap-3">
+      {/* Input Area - FR-008 Mobile Keyboard Support */}
+      <div className="border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 md:px-6 py-3 md:py-4">
+        <div className="flex items-end gap-2 md:gap-3">
           <textarea
             ref={inputRef}
             value={input}
@@ -318,35 +376,35 @@ export const ChatInterface: React.FC = () => {
             placeholder="Type a message... (Shift+Enter for new line)"
             disabled={isGenerating}
             rows={1}
-            className="flex-1 px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none overflow-y-auto"
-            style={{ minHeight: '52px', maxHeight: '200px' }}
+            className="flex-1 px-3 md:px-4 py-2 md:py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed resize-none overflow-y-auto text-sm md:text-base"
+            style={{ minHeight: '44px', maxHeight: '200px' }}
           />
 
           {/* Send or Stop button */}
           {isGenerating ? (
             <button
               onClick={handleStop}
-              className="px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+              className="px-3 md:px-4 py-2 md:py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center gap-1 md:gap-2 font-medium text-sm md:text-base flex-shrink-0"
               aria-label="Stop generation"
             >
-              <StopCircle size={20} />
-              Stop
+              <StopCircle size={18} className="md:w-5 md:h-5" />
+              <span className="hidden sm:inline">Stop</span>
             </button>
           ) : (
             <button
               onClick={handleSend}
               disabled={!input.trim()}
-              className="px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+              className="px-3 md:px-4 py-2 md:py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-1 md:gap-2 font-medium text-sm md:text-base flex-shrink-0"
               aria-label="Send message"
             >
-              <Send size={20} />
-              Send
+              <Send size={18} className="md:w-5 md:h-5" />
+              <span className="hidden sm:inline">Send</span>
             </button>
           )}
         </div>
 
         {/* Helper text (FR-009) */}
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 hidden md:block">
           Press Enter or Ctrl+Enter to send, Shift+Enter for new line
         </p>
       </div>
