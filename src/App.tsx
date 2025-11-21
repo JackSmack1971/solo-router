@@ -4,14 +4,14 @@
  * Based on SPEC.md FR-001 through FR-004
  */
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Settings, MessageSquare, Menu, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Settings, MessageSquare, Menu, X, Download, Upload } from 'lucide-react';
 import { useChatStore } from './store/chatStore';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { useTheme } from './hooks/useTheme';
-import { hasApiKey } from './utils/storage';
+import { hasApiKey, exportData, importData } from './utils/storage';
 
 /**
  * Sidebar conversation item component
@@ -68,6 +68,8 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize theme
   useTheme();
@@ -115,6 +117,54 @@ function App() {
   const handleDeleteConversation = (id: string) => {
     if (confirm('Are you sure you want to delete this conversation?')) {
       deleteConversation(id);
+    }
+  };
+
+  /**
+   * Handle export data
+   */
+  const handleExportData = () => {
+    try {
+      exportData();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to export data');
+    }
+  };
+
+  /**
+   * Handle import data
+   */
+  const handleImportData = () => {
+    fileInputRef.current?.click();
+  };
+
+  /**
+   * Handle file selection for import
+   */
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      setImportStatus('Importing...');
+      const result = await importData(file, 'merge');
+      setImportStatus(`Imported ${result.conversations} conversations successfully!`);
+
+      // Reload data from storage
+      loadFromStorage();
+
+      // Clear status after 3 seconds
+      setTimeout(() => setImportStatus(null), 3000);
+    } catch (err) {
+      setImportStatus(null);
+      alert(err instanceof Error ? err.message : 'Failed to import data');
+    } finally {
+      // Clear the file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -190,6 +240,16 @@ function App() {
 
           {/* Sidebar Footer */}
           <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+            {/* Import status message */}
+            {importStatus && (
+              <div className="p-2 bg-green-100 dark:bg-green-900 border border-green-300 dark:border-green-700 rounded-lg">
+                <p className="text-xs text-green-800 dark:text-green-200 text-center">
+                  {importStatus}
+                </p>
+              </div>
+            )}
+
+            {/* Settings and Theme Toggle */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsSettingsOpen(true)}
@@ -200,6 +260,36 @@ function App() {
               </button>
               <ThemeToggle />
             </div>
+
+            {/* Export/Import Data */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportData}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg transition-colors text-sm"
+                aria-label="Export conversations"
+              >
+                <Download size={16} />
+                Export
+              </button>
+              <button
+                onClick={handleImportData}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded-lg transition-colors text-sm"
+                aria-label="Import conversations"
+              >
+                <Upload size={16} />
+                Import
+              </button>
+            </div>
+
+            {/* Hidden file input for import */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleFileSelect}
+              className="hidden"
+              aria-label="Import file input"
+            />
           </div>
         </div>
       </div>
