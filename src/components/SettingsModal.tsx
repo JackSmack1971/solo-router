@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Eye, EyeOff, RefreshCw, Search } from 'lucide-react';
+import { X, Eye, EyeOff, RefreshCw, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import { getApiKey, saveApiKey, clearApiKey } from '../utils/storage';
 import { useChatStore } from '../store/chatStore';
 import { formatPricing } from '../utils/tokenUtils';
@@ -80,6 +80,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [temperature, setTemperature] = useState(settings.temperature);
   const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt || '');
 
+  // Advanced parameters state
+  const [topP, setTopP] = useState(settings.topP ?? 1.0);
+  const [frequencyPenalty, setFrequencyPenalty] = useState(settings.frequencyPenalty ?? 0.0);
+  const [presencePenalty, setPresencePenalty] = useState(settings.presencePenalty ?? 0.0);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -93,6 +99,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         setSelectedModel(settings.defaultModel || modelsList[0]?.id || '');
         setTemperature(settings.temperature);
         setSystemPrompt(settings.systemPrompt || '');
+        setTopP(settings.topP ?? 1.0);
+        setFrequencyPenalty(settings.frequencyPenalty ?? 0.0);
+        setPresencePenalty(settings.presencePenalty ?? 0.0);
+        setShowAdvanced(false);
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -119,6 +129,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       defaultModel: selectedModel,
       temperature,
       systemPrompt: systemPrompt.trim() || null,
+      topP,
+      frequencyPenalty,
+      presencePenalty,
     });
 
     setIsSaved(true);
@@ -366,6 +379,109 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               Instructions that set the assistant's behavior and personality.
             </p>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-700" />
+
+          {/* Advanced Parameters Section */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 w-full text-left text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+            >
+              {showAdvanced ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              Advanced Parameters
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-4 space-y-4 pl-6">
+                {/* Top P Slider */}
+                <div>
+                  <label
+                    htmlFor="top-p"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    Top P (Nucleus Sampling): {topP.toFixed(2)}
+                  </label>
+                  <input
+                    id="top-p"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    value={topP}
+                    onChange={(e) => setTopP(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <span>Focused (0.0)</span>
+                    <span>Balanced (0.9)</span>
+                    <span>Diverse (1.0)</span>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Controls diversity via nucleus sampling. Lower values focus on likely tokens.
+                  </p>
+                </div>
+
+                {/* Frequency Penalty Slider */}
+                <div>
+                  <label
+                    htmlFor="frequency-penalty"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    Frequency Penalty: {frequencyPenalty.toFixed(1)}
+                  </label>
+                  <input
+                    id="frequency-penalty"
+                    type="range"
+                    min="-2"
+                    max="2"
+                    step="0.1"
+                    value={frequencyPenalty}
+                    onChange={(e) => setFrequencyPenalty(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <span>Encourage (-2.0)</span>
+                    <span>Neutral (0.0)</span>
+                    <span>Discourage (2.0)</span>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Reduces repetition. Positive values penalize frequently used tokens.
+                  </p>
+                </div>
+
+                {/* Presence Penalty Slider */}
+                <div>
+                  <label
+                    htmlFor="presence-penalty"
+                    className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                  >
+                    Presence Penalty: {presencePenalty.toFixed(1)}
+                  </label>
+                  <input
+                    id="presence-penalty"
+                    type="range"
+                    min="-2"
+                    max="2"
+                    step="0.1"
+                    value={presencePenalty}
+                    onChange={(e) => setPresencePenalty(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <span>Familiar (-2.0)</span>
+                    <span>Neutral (0.0)</span>
+                    <span>Novel (2.0)</span>
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                    Encourages new topics. Positive values penalize already-mentioned tokens.
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Success Message */}

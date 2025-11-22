@@ -46,6 +46,9 @@ export interface ConversationSettings {
   temperature: number;
   maxTokens: number;
   systemPrompt: string | null;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
 }
 
 /**
@@ -66,6 +69,9 @@ export interface AppSettings {
   temperature: number;
   maxTokens: number;
   systemPrompt: string | null;
+  topP?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
 }
 
 /**
@@ -92,6 +98,9 @@ export interface StreamParams {
     temperature: number;
     maxTokens: number;
     systemPrompt?: string | null;
+    topP?: number;
+    frequencyPenalty?: number;
+    presencePenalty?: number;
   };
   onChunk: (text: string) => void;
   onDone: (usage?: TokenUsage) => void;

@@ -105,6 +105,17 @@ export class OpenRouterProvider implements ChatProvider {
       max_tokens: params.settings.maxTokens,
     };
 
+    // Add advanced parameters if provided
+    if (params.settings.topP !== undefined) {
+      requestBody.top_p = params.settings.topP;
+    }
+    if (params.settings.frequencyPenalty !== undefined) {
+      requestBody.frequency_penalty = params.settings.frequencyPenalty;
+    }
+    if (params.settings.presencePenalty !== undefined) {
+      requestBody.presence_penalty = params.settings.presencePenalty;
+    }
+
     // Add system prompt if provided
     if (params.settings.systemPrompt) {
       requestBody.messages.unshift({

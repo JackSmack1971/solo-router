@@ -14,6 +14,7 @@ import {
   DEFAULT_SETTINGS,
 } from '../utils/storage';
 import { defaultProvider } from '../services/openRouter';
+import { estimateConversationTokens, isNearContextLimit } from '../utils/tokenUtils';
 
 /**
  * Chat store state interface
@@ -104,6 +105,9 @@ function createNewConversation(title: string, settings: AppSettings): Conversati
       temperature: settings.temperature,
       maxTokens: settings.maxTokens,
       systemPrompt: settings.systemPrompt,
+      topP: settings.topP,
+      frequencyPenalty: settings.frequencyPenalty,
+      presencePenalty: settings.presencePenalty,
     },
     metadata: {
       messageCount: 0,
@@ -453,6 +457,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
           temperature: updatedConv.settings.temperature,
           maxTokens: updatedConv.settings.maxTokens,
           systemPrompt: updatedConv.settings.systemPrompt,
+          topP: updatedConv.settings.topP,
+          frequencyPenalty: updatedConv.settings.frequencyPenalty,
+          presencePenalty: updatedConv.settings.presencePenalty,
         },
         onChunk: (text: string) => {
           // Append text to the assistant message
@@ -623,6 +630,31 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       // Prepare messages for API (exclude the empty assistant message we just added)
       const messagesForApi = updatedConv.messages.slice(0, -1);
 
+      // Context window safety check
+      const estimatedTokens = estimateConversationTokens(
+        messagesForApi.map((m) => ({ role: m.role, content: m.content })),
+        updatedConv.settings.systemPrompt
+      );
+
+      // Try to get context length from available models
+      const { availableModels } = get();
+      const currentModel = availableModels.find((m) => m.id === updatedConv.model);
+      const contextLength = currentModel?.contextLength;
+
+      // Warn if approaching context limit (default to 8k if unknown)
+      if (contextLength && isNearContextLimit(estimatedTokens, contextLength)) {
+        const warningMessage = `Warning: You're approaching the context limit (${estimatedTokens.toLocaleString()} / ${contextLength.toLocaleString()} tokens). Consider starting a new conversation or the model may truncate your history.`;
+        console.warn('[ChatStore] Context window warning:', warningMessage);
+        // Set a non-blocking warning (doesn't prevent sending)
+        get().setError(warningMessage);
+        // Clear the warning after 5 seconds
+        setTimeout(() => {
+          if (get().error === warningMessage) {
+            get().clearError();
+          }
+        }, 5000);
+      }
+
       await defaultProvider.streamChat({
         messages: messagesForApi,
         model: activeConv.model,
@@ -630,6 +662,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
           temperature: activeConv.settings.temperature,
           maxTokens: activeConv.settings.maxTokens,
           systemPrompt: activeConv.settings.systemPrompt,
+          topP: activeConv.settings.topP,
+          frequencyPenalty: activeConv.settings.frequencyPenalty,
+          presencePenalty: activeConv.settings.presencePenalty,
         },
         onChunk: (text: string) => {
           // Append text to the assistant message
