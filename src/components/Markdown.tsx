@@ -20,14 +20,14 @@ renderer.code = function({ text, lang }: { text: string; lang?: string; escaped?
   if (lang && hljs.getLanguage(lang)) {
     try {
       const highlighted = hljs.highlight(text, { language: lang }).value;
-      return `<pre class="code-block-wrapper"><code class="hljs language-${lang}" data-code="${encodeURIComponent(text)}">${highlighted}</code></pre>`;
+      return `<pre class="code-block-wrapper overflow-x-auto max-w-full w-full"><code class="hljs language-${lang}" data-code="${encodeURIComponent(text)}">${highlighted}</code></pre>`;
     } catch (err) {
       console.warn('[Markdown] Failed to highlight code:', err);
     }
   }
   // Auto-detect language if not specified or invalid
   const highlighted = hljs.highlightAuto(text).value;
-  return `<pre class="code-block-wrapper"><code class="hljs" data-code="${encodeURIComponent(text)}">${highlighted}</code></pre>`;
+  return `<pre class="code-block-wrapper overflow-x-auto max-w-full w-full"><code class="hljs" data-code="${encodeURIComponent(text)}">${highlighted}</code></pre>`;
 };
 
 /**
