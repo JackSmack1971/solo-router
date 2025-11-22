@@ -35,11 +35,14 @@ interface ChatStore {
   renameConversation: (id: string, title: string) => void;
   deleteConversation: (id: string) => void;
   getActiveConversation: () => Conversation | null;
+  updateConversationSettings: (id: string, settings: Partial<Conversation['settings']>) => void;
+  updateConversationModel: (id: string, model: string) => void;
 
   // Message Management
   addMessage: (conversationId: string, message: Omit<Message, 'id' | 'timestamp'>) => void;
   updateMessage: (conversationId: string, messageId: string, content: string) => void;
   deleteMessage: (conversationId: string, messageId: string) => void;
+  editMessageAndRegenerate: (conversationId: string, messageId: string, newContent: string) => Promise<void>;
 
   // Streaming & Generation
   sendMessage: (content: string) => Promise<void>;
@@ -227,6 +230,34 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     return conversations.find((conv) => conv.id === activeConversationId) || null;
   },
 
+  updateConversationSettings: (id: string, newSettings: Partial<Conversation['settings']>) => {
+    set((state) => ({
+      conversations: state.conversations.map((conv) =>
+        conv.id === id
+          ? {
+              ...conv,
+              settings: { ...conv.settings, ...newSettings },
+              updatedAt: Date.now(),
+            }
+          : conv
+      ),
+    }));
+
+    debouncedSave(() => get().saveToStorage());
+  },
+
+  updateConversationModel: (id: string, model: string) => {
+    set((state) => ({
+      conversations: state.conversations.map((conv) =>
+        conv.id === id
+          ? { ...conv, model, updatedAt: Date.now() }
+          : conv
+      ),
+    }));
+
+    debouncedSave(() => get().saveToStorage());
+  },
+
   // ========================================================================
   // Message Management
   // ========================================================================
@@ -317,6 +348,220 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     }));
 
     debouncedSave(() => get().saveToStorage());
+  },
+
+  editMessageAndRegenerate: async (conversationId: string, messageId: string, newContent: string) => {
+    // Find the conversation
+    const conversation = get().conversations.find((conv) => conv.id === conversationId);
+    if (!conversation) {
+      console.error('[ChatStore] Conversation not found for edit');
+      return;
+    }
+
+    // Find the message index
+    const messageIndex = conversation.messages.findIndex((msg) => msg.id === messageId);
+    if (messageIndex === -1) {
+      console.error('[ChatStore] Message not found for edit');
+      return;
+    }
+
+    // Update the message content and truncate all messages after it
+    set((state) => ({
+      conversations: state.conversations.map((conv) => {
+        if (conv.id !== conversationId) {
+          return conv;
+        }
+
+        // Keep messages up to and including the edited message
+        const truncatedMessages = conv.messages.slice(0, messageIndex + 1);
+
+        // Update the edited message
+        truncatedMessages[messageIndex] = {
+          ...truncatedMessages[messageIndex],
+          content: newContent,
+          timestamp: Date.now(),
+        };
+
+        return {
+          ...conv,
+          messages: truncatedMessages,
+          updatedAt: Date.now(),
+          metadata: {
+            ...conv.metadata,
+            messageCount: truncatedMessages.length,
+          },
+        };
+      }),
+    }));
+
+    debouncedSave(() => get().saveToStorage());
+
+    // Now regenerate the assistant response by re-using sendMessage logic
+    // If this is not the active conversation, set it as active first
+    const wasActive = conversationId === get().activeConversationId;
+    if (!wasActive) {
+      get().setActiveConversation(conversationId);
+    }
+
+    // Get the updated conversation
+    const updatedConv = get().conversations.find((c) => c.id === conversationId);
+    if (!updatedConv) {
+      console.error('[ChatStore] Conversation disappeared during edit');
+      return;
+    }
+
+    // Create placeholder for assistant message
+    const assistantMessageId = generateId();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: Date.now(),
+      model: updatedConv.model,
+    };
+
+    set((state) => ({
+      conversations: state.conversations.map((conv) =>
+        conv.id === conversationId
+          ? { ...conv, messages: [...conv.messages, assistantMessage] }
+          : conv
+      ),
+    }));
+
+    // Create abort controller for this request
+    const abortController = new AbortController();
+
+    set({
+      isGenerating: true,
+      currentAbortController: abortController,
+    });
+
+    try {
+      // Get the conversation with the assistant placeholder
+      const convWithPlaceholder = get().conversations.find((c) => c.id === conversationId);
+      if (!convWithPlaceholder) {
+        throw new Error('Conversation disappeared during generation');
+      }
+
+      // Prepare messages for API (exclude the empty assistant message we just added)
+      const messagesForApi = convWithPlaceholder.messages.slice(0, -1);
+
+      await defaultProvider.streamChat({
+        messages: messagesForApi,
+        model: updatedConv.model,
+        settings: {
+          temperature: updatedConv.settings.temperature,
+          maxTokens: updatedConv.settings.maxTokens,
+          systemPrompt: updatedConv.settings.systemPrompt,
+        },
+        onChunk: (text: string) => {
+          // Append text to the assistant message
+          set((state) => ({
+            conversations: state.conversations.map((conv) =>
+              conv.id === conversationId
+                ? {
+                    ...conv,
+                    messages: conv.messages.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? { ...msg, content: msg.content + text }
+                        : msg
+                    ),
+                  }
+                : conv
+            ),
+          }));
+        },
+        onDone: (usage?: TokenUsage) => {
+          // Update token count if available
+          if (usage) {
+            set((state) => ({
+              conversations: state.conversations.map((conv) => {
+                if (conv.id !== conversationId) {
+                  return conv;
+                }
+
+                return {
+                  ...conv,
+                  messages: conv.messages.map((msg) =>
+                    msg.id === assistantMessageId
+                      ? { ...msg, tokenCount: usage.totalTokens }
+                      : msg
+                  ),
+                  metadata: {
+                    messageCount: conv.metadata?.messageCount || conv.messages.length,
+                    totalTokens:
+                      (conv.metadata?.totalTokens || 0) + (usage.totalTokens || 0),
+                  },
+                };
+              }),
+            }));
+          }
+
+          set({
+            isGenerating: false,
+            currentAbortController: null,
+          });
+
+          // Save to storage after completion
+          get().saveToStorage();
+        },
+        onError: (error: Error) => {
+          console.error('[ChatStore] Generation error:', error);
+
+          // Parse error message to detect specific error codes
+          let errorMessage = error.message || 'Failed to generate response';
+          const errorStr = error.message?.toLowerCase() || '';
+
+          // Detect specific error codes (R-001)
+          if (errorStr.includes('401') || errorStr.includes('unauthorized') || errorStr.includes('invalid api key')) {
+            errorMessage = 'Invalid API Key. Please check your OpenRouter API key in Settings.';
+          } else if (errorStr.includes('402') || errorStr.includes('insufficient credits') || errorStr.includes('no credits')) {
+            errorMessage = 'Insufficient Credits. Your OpenRouter account has run out of credits.';
+          } else if (errorStr.includes('429') || errorStr.includes('rate limit')) {
+            errorMessage = 'Rate Limit Exceeded. Please wait a moment before trying again.';
+          } else if (errorStr.includes('api key') || errorStr.includes('missing api key')) {
+            errorMessage = 'Missing API Key. Please set your OpenRouter API key in Settings.';
+          }
+
+          // Set global error state
+          get().setError(errorMessage);
+
+          // Mark the message as having an error
+          set((state) => ({
+            conversations: state.conversations.map((conv) =>
+              conv.id === conversationId
+                ? {
+                    ...conv,
+                    messages: conv.messages.map((msg) =>
+                      msg.id === assistantMessageId
+                        ? {
+                            ...msg,
+                            error: true,
+                            content:
+                              msg.content ||
+                              `Error: ${errorMessage}`,
+                          }
+                        : msg
+                    ),
+                  }
+                : conv
+            ),
+            isGenerating: false,
+            currentAbortController: null,
+          }));
+
+          // Save even on error
+          get().saveToStorage();
+        },
+        signal: abortController.signal,
+      });
+    } catch (error) {
+      console.error('[ChatStore] Unexpected error in editMessageAndRegenerate:', error);
+      set({
+        isGenerating: false,
+        currentAbortController: null,
+      });
+    }
   },
 
   // ========================================================================
