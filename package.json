@@ -13,6 +13,7 @@
     "type-check": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.13.12",
     "clsx": "^2.1.1",
     "dompurify": "^3.3.0",
     "highlight.js": "^11.11.1",
