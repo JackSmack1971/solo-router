@@ -1,206 +1,202 @@
 # SoloRouter Chat
 
-A **local-first**, **privacy-focused** chat interface for Large Language Models. SoloRouter runs entirely in your browser with no backend server, connecting directly to [OpenRouter](https://openrouter.ai/) or your local LLM endpoint.
+A **local-first**, **privacy-focused** chat interface for Large Language Models (LLMs). SoloRouter runs entirely in the browser as a Single Page Application (SPA) with no backend server, connecting directly to [OpenRouter](https://openrouter.ai/) or compatible endpoints.
 
-> **Philosophy:** Simple, hackable, and respectful of your privacy. Think "personal text editor for AI chat" rather than SaaS platform.
+-----
 
----
+## 📖 Table of Contents
 
-## ✨ Features
+  - [Overview](https://www.google.com/search?q=%23overview)
+  - [Key Features](https://www.google.com/search?q=%23key-features)
+  - [Architecture](https://www.google.com/search?q=%23architecture)
+  - [Technology Stack](https://www.google.com/search?q=%23technology-stack)
+  - [Getting Started](https://www.google.com/search?q=%23getting-started)
+  - [Configuration](https://www.google.com/search?q=%23configuration)
+  - [Development](https://www.google.com/search?q=%23development)
+  - [Project Structure](https://www.google.com/search?q=%23project-structure)
+  - [License](https://www.google.com/search?q=%23license)
 
-- **🔒 Privacy First**: API keys stored in session memory only, conversations saved locally
-- **⚡ Real-Time Streaming**: Server-Sent Events (SSE) for immediate response display
-- **📝 Rich Markdown**: Full rendering with syntax highlighting and code copy buttons
-- **🎨 Multiple Themes**: Light, dark, and system-based theme support
-- **⚙️ Flexible Configuration**: Model selection, temperature, max tokens, and custom system prompts
-- **📤 Data Portability**: Export and import conversations as JSON
-- **🚫 No Backend**: Direct browser-to-API communication, no intermediate servers
+-----
 
----
+## Overview
 
-## 🚀 Quick Start
+SoloRouter is designed as a "personal text editor for AI chat." It prioritizes user privacy by storing conversation history locally within the browser and maintaining ephemeral API key storage. The application facilitates direct client-to-API communication without intermediate servers.
+
+-----
+
+## Key Features
+
+  * **Local-First Persistence**: Conversations and application settings are stored in the browser's `localStorage`.
+  * **Ephemeral Security**: OpenRouter API keys are stored exclusively in `sessionStorage` (cleared on tab close) unless the user explicitly opts for local persistence.
+  * **Real-Time Streaming**: Supports Server-Sent Events (SSE) for immediate, token-by-token response display from OpenRouter.
+  * **Rich Markdown Support**: Renders responses with GitHub-flavored markdown, syntax highlighting, and sanitized HTML.
+  * **Conversation Management**: Create, rename, delete, and switch between multiple conversation threads.
+  * **Data Portability**: Full JSON export and import functionality for conversation backups.
+  * **PWA Support**: Configured as a Progressive Web App for standalone installation.
+
+-----
+
+## Architecture
+
+SoloRouter operates as a client-only React application. It manages state via Zustand and interfaces directly with external APIs.
+
+### System Architecture
+
+```mermaid
+graph TD
+    User[User] -->|Interacts| UI[React UI Components]
+    UI -->|Reads/Writes| Store[Zustand Chat Store]
+    
+    subgraph "Browser Storage"
+        Store -->|Persists Chats/Settings| LS[localStorage]
+        Store -->|Reads API Key| SS[sessionStorage]
+    end
+    
+    subgraph "External Services"
+        Store -->|Stream Request| Service[OpenRouter Service]
+        Service -->|HTTPS| OpenRouter[OpenRouter API]
+        OpenRouter -->|SSE Stream| Service
+    end
+```
+
+### Component Relationship (Core)
+
+```mermaid
+classDiagram
+    class App {
+        +ThemeToggle
+        +SettingsModal
+        +Sidebar
+        +ChatInterface
+    }
+    class ChatInterface {
+        +MessageList
+        +ConversationSettingsModal
+    }
+    class ChatStore {
+        +conversations: Conversation[]
+        +settings: AppSettings
+        +sendMessage(content)
+        +streamChat()
+    }
+    class OpenRouterProvider {
+        +streamChat(params)
+        +listModels()
+    }
+    
+    App --> ChatInterface
+    ChatInterface --> ChatStore : uses
+    ChatStore --> OpenRouterProvider : calls
+```
+
+-----
+
+## Technology Stack
+
+Based on the project configuration files:
+
+  * **Runtime Environment**: Browser (Client-side only)
+  * **Framework**: React 19
+  * **Build Tool**: Vite 7
+  * **Language**: TypeScript 5.9
+  * **State Management**: Zustand 5
+  * **Styling**: Tailwind CSS 3
+  * **Markdown Rendering**: `marked` with `dompurify` for sanitization and `highlight.js` for syntax highlighting
+  * **Testing**: Vitest
+
+-----
+
+## Getting Started
 
 ### Prerequisites
 
-- **Node.js** 20+
-- **pnpm** (or npm/yarn)
-- **OpenRouter API Key** ([Get one here](https://openrouter.ai/keys))
+  * **Node.js** 20+
+  * **pnpm** (or npm/yarn)
 
 ### Installation
 
-```bash
-# Clone the repository
-git clone https://github.com/jacksmack1971/solo-router.git
-cd solo-router
+1.  **Clone the repository**:
 
-# Install dependencies
-pnpm install
+    ```bash
+    git clone https://github.com/jacksmack1971/solo-router.git
+    cd solo-router
+    ```
 
-# Start development server
-pnpm dev
-```
+2.  **Install dependencies**:
 
-The app will be available at `http://localhost:5173`
+    ```bash
+    pnpm install
+    ```
 
----
+3.  **Start the development server**:
 
-## 🔑 Configuration
+    ```bash
+    pnpm dev
+    ```
 
-### Getting an OpenRouter API Key
+The application will be accessible at `http://localhost:5173`.
 
-1. Visit [OpenRouter](https://openrouter.ai/)
-2. Sign up or log in
-3. Navigate to [API Keys](https://openrouter.ai/keys)
-4. Create a new key
-5. Copy your key (starts with `sk-or-...`)
+-----
 
-### Setting Up Your Key
+## Configuration
 
-1. Open SoloRouter in your browser
-2. Click the **Settings** icon (⚙️)
-3. Paste your API key in the "OpenRouter API Key" field
-4. Select your preferred default model
-5. Adjust temperature and other settings as desired
+To use the chat capabilities, you must provide an API key.
 
-**Security Note:** Your API key is stored in `sessionStorage` only and is cleared when you close the browser tab. It is never persisted to disk or sent anywhere except directly to OpenRouter.
+1.  Open the application settings by clicking the **Settings** icon.
+2.  Enter your **OpenRouter API Key**.
+      * *Security Note*: By default, keys are saved to `sessionStorage` and cleared when the tab closes. You may optionally choose to "Remember key on this device" to persist it in `localStorage`.
+3.  Configure global defaults:
+      * **Model**: Select from available OpenRouter models (e.g., `anthropic/claude-3.5-sonnet`).
+      * **Temperature**: Adjust response randomness.
+      * **System Prompt**: Define the default assistant persona.
 
----
+-----
 
-## 💡 Usage
+## Development
 
-### Starting a Conversation
+The project uses `pnpm` for script management. Defined scripts in `package.json`:
 
-1. Type your message in the input field at the bottom
-2. Press **Enter** or click **Send**
-3. Watch the AI response stream in real-time
+| Script | Description |
+| :--- | :--- |
+| `dev` | Starts the Vite development server. |
+| `build` | Compiles TypeScript and builds the app for production. |
+| `preview` | Previews the production build locally. |
+| `lint` | Runs ESLint for code quality checks. |
+| `test` | Runs unit tests using Vitest. |
+| `test:run` | Runs tests once (CI mode). |
+| `type-check` | Runs TypeScript type checking without emitting files. |
 
-### Managing Conversations
+-----
 
-- **New Chat**: Click the "New Chat" button
-- **Switch Chats**: Click on any conversation in the sidebar
-- **Delete Chat**: Click the trash icon next to a conversation
-- **Export Data**: Settings → Export (saves all conversations as JSON)
-- **Import Data**: Settings → Import (restore from backup file)
+## Project Structure
 
-### Keyboard Shortcuts
-
-- **Ctrl/Cmd + Enter**: Send message
-- **Ctrl/Cmd + K**: New conversation
-- **Ctrl/Cmd + /**: Toggle settings
-
----
-
-## 🛠️ Development
-
-### Available Scripts
-
-```bash
-pnpm dev          # Start development server
-pnpm build        # Build for production
-pnpm lint         # Run ESLint
-pnpm test         # Run tests in watch mode
-pnpm test:run     # Run tests once
-pnpm type-check   # TypeScript type checking
-```
-
-### Tech Stack
-
-- **React 19** - UI framework
-- **TypeScript 5.9** - Type safety
-- **Vite 7** - Build tool
-- **Zustand 5** - State management
-- **Tailwind CSS 3** - Styling
-- **Marked** - Markdown parsing
-- **DOMPurify** - XSS protection
-- **Highlight.js** - Syntax highlighting
-- **Vitest** - Testing framework
-
-### Project Structure
+The source code is organized within the `src` directory:
 
 ```
 src/
+├── assets/          # Static assets (SVG, etc.)
 ├── components/      # React UI components
 │   ├── ChatInterface.tsx
 │   ├── Markdown.tsx
+│   ├── MessageList.tsx
 │   ├── SettingsModal.tsx
-│   └── __tests__/   # Component tests
-├── hooks/           # Custom React hooks
-├── services/        # API clients (OpenRouter)
-├── store/           # Zustand state management
-├── types/           # TypeScript type definitions
-└── utils/           # Helper functions
-    ├── storage.ts   # localStorage/sessionStorage utilities
-    └── __tests__/   # Utility tests
+│   └── ...
+├── hooks/           # Custom React hooks (e.g., useTheme)
+├── services/        # API interactions (OpenRouter client)
+├── store/           # State management (Zustand stores)
+├── test/            # Test setup configuration
+├── types/           # TypeScript interfaces and types
+├── utils/           # Utility functions (Storage, Token counting)
+├── App.tsx          # Main application layout
+└── main.tsx         # Application entry point
 ```
 
----
+-----
 
-## 🔒 Security
+## License
 
-SoloRouter takes security seriously, even as a client-only application:
+This project is licensed under the MIT License.
 
-- **XSS Prevention**: All model output is sanitized with DOMPurify before rendering
-- **API Key Protection**: Keys stored in sessionStorage only, never logged or persisted
-- **No Data Leakage**: All conversations stored locally in your browser's localStorage
-- **Direct API Calls**: No intermediate servers that could intercept your data
+Copyright (c) 2025 JackSmack1971.
 
----
-
-## 📖 Documentation
-
-For detailed information about the project:
-
-- **[SPEC.md](./SPEC.md)** - Functional requirements and specifications
-- **[CODING_STANDARDS.md](./CODING_STANDARDS.md)** - Architecture and coding conventions
-- **[CLAUDE.md](./CLAUDE.md)** - AI collaboration guide
-
----
-
-## 🧪 Testing
-
-SoloRouter includes comprehensive tests for critical functionality:
-
-```bash
-# Run all tests
-pnpm test
-
-# Run tests once (CI mode)
-pnpm test:run
-
-# Run with coverage
-pnpm test:run --coverage
-```
-
-Test coverage focuses on:
-- **Security**: XSS prevention, sanitization
-- **Storage**: localStorage vs sessionStorage usage
-- **Markdown**: Rendering correctness
-
----
-
-## 🤝 Contributing
-
-This is a personal project, but contributions are welcome! Please ensure:
-
-1. Tests pass (`pnpm test:run`)
-2. Linting passes (`pnpm lint`)
-3. Types check (`pnpm type-check`)
-4. Code follows existing patterns
-
----
-
-## 📄 License
-
-MIT License - see [LICENSE](./LICENSE) for details.
-
----
-
-## 🙏 Acknowledgments
-
-- [OpenRouter](https://openrouter.ai/) - LLM API aggregation service
-- [Anthropic](https://www.anthropic.com/) - Claude models
-- [OpenAI](https://openai.com/) - GPT models
-
----
-
-**Built with ❤️ for privacy-conscious AI enthusiasts**
+See the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
