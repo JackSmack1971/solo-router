@@ -4,11 +4,14 @@
  * Based on SPEC.md FR-001 through FR-004
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Settings, MessageSquare, Menu, X, Download, Upload, Pencil, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, Trash2, Settings, MessageSquare, Menu, X, Download, Upload, Pencil, Check, Search } from 'lucide-react';
 import { useChatStore } from './store/chatStore';
+import { useToastStore } from './store/toastStore';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
+import { ToastContainer } from './components/ToastContainer';
+import { ConfirmationModal } from './components/ConfirmationModal';
 import { ThemeToggle } from './components/ThemeToggle';
 import { useTheme } from './hooks/useTheme';
 import { hasApiKey, exportData, importData } from './utils/storage';
@@ -178,8 +181,24 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
-  const [importStatus, setImportStatus] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Confirmation modal state
+  const [confirmationModal, setConfirmationModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  // Toast store
+  const toast = useToastStore();
 
   // Initialize theme
   useTheme();
@@ -192,6 +211,18 @@ function App() {
   const deleteConversation = useChatStore((state) => state.deleteConversation);
   const renameConversation = useChatStore((state) => state.renameConversation);
   const loadFromStorage = useChatStore((state) => state.loadFromStorage);
+
+  // Filter conversations based on search query
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return conversations;
+    }
+
+    const searchLower = searchQuery.toLowerCase();
+    return conversations.filter((conv) =>
+      conv.title.toLowerCase().includes(searchLower)
+    );
+  }, [conversations, searchQuery]);
 
   /**
    * Load data from storage on mount
@@ -226,9 +257,15 @@ function App() {
    * Handle delete conversation
    */
   const handleDeleteConversation = (id: string) => {
-    if (confirm('Are you sure you want to delete this conversation?')) {
-      deleteConversation(id);
-    }
+    setConfirmationModal({
+      isOpen: true,
+      title: 'Delete Conversation',
+      message: 'Are you sure you want to delete this conversation? This action cannot be undone.',
+      onConfirm: () => {
+        deleteConversation(id);
+        setConfirmationModal({ ...confirmationModal, isOpen: false });
+      },
+    });
   };
 
   /**
@@ -237,8 +274,9 @@ function App() {
   const handleExportData = () => {
     try {
       exportData();
+      toast.success('Data exported successfully!');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to export data');
+      toast.error(err instanceof Error ? err.message : 'Failed to export data');
     }
   };
 
@@ -259,18 +297,14 @@ function App() {
     }
 
     try {
-      setImportStatus('Importing...');
+      toast.info('Importing data...');
       const result = await importData(file, 'merge');
-      setImportStatus(`Imported ${result.conversations} conversations successfully!`);
+      toast.success(`Imported ${result.conversations} conversations successfully!`);
 
       // Reload data from storage
       loadFromStorage();
-
-      // Clear status after 3 seconds
-      setTimeout(() => setImportStatus(null), 3000);
     } catch (err) {
-      setImportStatus(null);
-      alert(err instanceof Error ? err.message : 'Failed to import data');
+      toast.error(err instanceof Error ? err.message : 'Failed to import data');
     } finally {
       // Clear the file input
       if (fileInputRef.current) {
@@ -313,11 +347,26 @@ function App() {
             </div>
             <button
               onClick={handleNewConversation}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium mb-3"
             >
               <Plus size={18} />
               New Chat
             </button>
+
+            {/* Search Input */}
+            <div className="relative">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500"
+              />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search conversations..."
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              />
+            </div>
           </div>
 
           {/* API Key Warning */}
@@ -344,8 +393,12 @@ function App() {
               <div className="text-center text-sm text-gray-500 dark:text-gray-400 py-8">
                 No conversations yet
               </div>
+            ) : filteredConversations.length === 0 ? (
+              <div className="text-center text-sm text-gray-500 dark:text-gray-400 py-8">
+                No conversations match "{searchQuery}"
+              </div>
             ) : (
-              conversations.map((conv) => (
+              filteredConversations.map((conv) => (
                 <ConversationItem
                   key={conv.id}
                   id={conv.id}
@@ -361,15 +414,6 @@ function App() {
 
           {/* Sidebar Footer */}
           <div className="p-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-            {/* Import status message */}
-            {importStatus && (
-              <div className="p-2 bg-green-100 dark:bg-green-900 border border-green-300 dark:border-green-700 rounded-lg">
-                <p className="text-xs text-green-800 dark:text-green-200 text-center">
-                  {importStatus}
-                </p>
-              </div>
-            )}
-
             {/* Settings and Theme Toggle */}
             <div className="flex items-center gap-2">
               <button
@@ -442,6 +486,21 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmationModal.isOpen}
+        title={confirmationModal.title}
+        message={confirmationModal.message}
+        onConfirm={confirmationModal.onConfirm}
+        onCancel={() => setConfirmationModal({ ...confirmationModal, isOpen: false })}
+        destructive={true}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
+
+      {/* Toast Container */}
+      <ToastContainer />
     </div>
   );
 }
