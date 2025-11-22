@@ -3,10 +3,12 @@
  * Based on CODING_STANDARDS.md Section 5 (Security)
  */
 
-import React, { useState, useEffect } from 'react';
-import { X, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { X, Eye, EyeOff, RefreshCw, Search } from 'lucide-react';
 import { getApiKey, saveApiKey, clearApiKey } from '../utils/storage';
 import { useChatStore } from '../store/chatStore';
+import { formatPricing } from '../utils/tokenUtils';
+import type { ModelSummary } from '../types';
 
 interface SettingsModalProps {
   /**
@@ -21,9 +23,9 @@ interface SettingsModalProps {
 }
 
 /**
- * Available models for selection
+ * Fallback models if none are loaded
  */
-const AVAILABLE_MODELS = [
+const FALLBACK_MODELS: { id: string; name: string }[] = [
   { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet' },
   { id: 'openai/gpt-4o', name: 'GPT-4o' },
   { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5' },
@@ -40,12 +42,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const [showApiKey, setShowApiKey] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
+  // Model search state
+  const [modelSearch, setModelSearch] = useState('');
+
   // App settings from store
   const settings = useChatStore((state) => state.settings);
   const updateSettings = useChatStore((state) => state.updateSettings);
+  const availableModels = useChatStore((state) => state.availableModels);
+  const isLoadingModels = useChatStore((state) => state.isLoadingModels);
+  const fetchModels = useChatStore((state) => state.fetchModels);
+
+  // Use available models or fallback
+  const modelsList: (ModelSummary | { id: string; name: string })[] =
+    availableModels.length > 0 ? availableModels : FALLBACK_MODELS;
+
+  // Filter models based on search
+  const filteredModels = useMemo(() => {
+    if (!modelSearch.trim()) {
+      return modelsList;
+    }
+
+    const searchLower = modelSearch.toLowerCase();
+    return modelsList.filter(
+      (model) => {
+        const hasDescription = 'description' in model && typeof model.description === 'string';
+        return (
+          model.id.toLowerCase().includes(searchLower) ||
+          model.name.toLowerCase().includes(searchLower) ||
+          (hasDescription && model.description?.toLowerCase().includes(searchLower))
+        );
+      }
+    );
+  }, [modelsList, modelSearch]);
 
   // Local state for settings
-  const [selectedModel, setSelectedModel] = useState(settings.defaultModel || AVAILABLE_MODELS[0].id);
+  const [selectedModel, setSelectedModel] = useState(settings.defaultModel || modelsList[0]?.id || '');
   const [temperature, setTemperature] = useState(settings.temperature);
   const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt || '');
 
@@ -57,14 +88,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         const key = getApiKey();
         setApiKey(key || '');
         setIsSaved(false);
+        setModelSearch('');
         // Update local settings from store
-        setSelectedModel(settings.defaultModel || AVAILABLE_MODELS[0].id);
+        setSelectedModel(settings.defaultModel || modelsList[0]?.id || '');
         setTemperature(settings.temperature);
         setSystemPrompt(settings.systemPrompt || '');
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, settings]);
+  }, [isOpen, settings, modelsList]);
+
+  // Fetch models when modal opens if we don't have any
+  useEffect(() => {
+    if (isOpen && availableModels.length === 0 && !isLoadingModels) {
+      fetchModels();
+    }
+  }, [isOpen, availableModels.length, isLoadingModels, fetchModels]);
 
   /**
    * Handle save button click
@@ -181,26 +220,102 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
           {/* Model Selection */}
           <div>
-            <label
-              htmlFor="model-select"
-              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
-            >
-              Default Model
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label
+                htmlFor="model-select"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+              >
+                Default Model
+              </label>
+              <button
+                onClick={() => fetchModels()}
+                disabled={isLoadingModels}
+                className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Refresh models"
+              >
+                <RefreshCw
+                  size={14}
+                  className={isLoadingModels ? 'animate-spin' : ''}
+                />
+                Refresh
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative mb-2">
+              <Search
+                size={16}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+              <input
+                type="text"
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+                placeholder="Search models..."
+                className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              />
+            </div>
+
+            {/* Model Dropdown */}
             <select
               id="model-select"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              size={Math.min(filteredModels.length, 8)}
             >
-              {AVAILABLE_MODELS.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name}
+              {filteredModels.length === 0 ? (
+                <option value="" disabled>
+                  No models found
                 </option>
-              ))}
+              ) : (
+                filteredModels.map((model) => {
+                  const hasPricing = 'pricing' in model && model.pricing;
+                  const pricingText = hasPricing ? ` (${formatPricing(model.pricing!)})` : '';
+                  return (
+                    <option key={model.id} value={model.id}>
+                      {model.name}{pricingText}
+                    </option>
+                  );
+                })
+              )}
             </select>
+
+            {/* Selected model details */}
+            {selectedModel && (() => {
+              const model = modelsList.find((m) => m.id === selectedModel);
+              if (!model) return null;
+
+              const hasDescription = 'description' in model && model.description;
+              const hasContextLength = 'contextLength' in model && model.contextLength;
+              const hasPricing = 'pricing' in model && model.pricing;
+
+              return (
+                <div className="mt-2 p-2 bg-gray-50 dark:bg-gray-700 rounded text-xs">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
+                    {model.name}
+                  </p>
+                  {hasDescription && (
+                    <p className="text-gray-600 dark:text-gray-400 mt-1">
+                      {(model as ModelSummary).description}
+                    </p>
+                  )}
+                  {hasContextLength && (
+                    <p className="text-gray-500 dark:text-gray-500 mt-1">
+                      Context: {(model as ModelSummary).contextLength!.toLocaleString()} tokens
+                    </p>
+                  )}
+                  {hasPricing && (
+                    <p className="text-gray-500 dark:text-gray-500 mt-1">
+                      Pricing: {formatPricing((model as ModelSummary).pricing!)}
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              The model to use for new conversations.
+              The model to use for new conversations. Pricing shown as prompt/completion per 1M tokens.
             </p>
           </div>
 

@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import type { Conversation, Message, AppSettings, TokenUsage } from '../types';
+import type { Conversation, Message, AppSettings, TokenUsage, ModelSummary } from '../types';
 import {
   saveConversations,
   loadConversations,
@@ -26,6 +26,8 @@ interface ChatStore {
   isGenerating: boolean;
   currentAbortController: AbortController | null;
   error: string | null;
+  availableModels: ModelSummary[];
+  isLoadingModels: boolean;
 
   // Conversation Management
   createConversation: (title?: string) => string;
@@ -45,6 +47,9 @@ interface ChatStore {
 
   // Settings Management
   updateSettings: (settings: Partial<AppSettings>) => void;
+
+  // Model Management
+  fetchModels: () => Promise<void>;
 
   // Error Management
   setError: (error: string | null) => void;
@@ -116,6 +121,32 @@ function debouncedSave(fn: () => void, delay = 500): void {
 }
 
 /**
+ * Load models from localStorage cache
+ */
+function loadModelsFromCache(): ModelSummary[] {
+  try {
+    const cached = localStorage.getItem('solorouter_models_cache');
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (err) {
+    console.warn('[ChatStore] Failed to load models from cache:', err);
+  }
+  return [];
+}
+
+/**
+ * Save models to localStorage cache
+ */
+function saveModelsToCache(models: ModelSummary[]): void {
+  try {
+    localStorage.setItem('solorouter_models_cache', JSON.stringify(models));
+  } catch (err) {
+    console.warn('[ChatStore] Failed to save models to cache:', err);
+  }
+}
+
+/**
  * Create the chat store
  */
 export const useChatStore = create<ChatStore>()((set, get) => ({
@@ -126,6 +157,8 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   isGenerating: false,
   currentAbortController: null,
   error: null,
+  availableModels: loadModelsFromCache(),
+  isLoadingModels: false,
 
   // ========================================================================
   // Conversation Management
@@ -493,6 +526,37 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
     // Save settings immediately (no debounce)
     const { settings } = get();
     saveSettings(settings);
+  },
+
+  // ========================================================================
+  // Model Management
+  // ========================================================================
+
+  fetchModels: async () => {
+    set({ isLoadingModels: true });
+
+    try {
+      const models = await defaultProvider.listModels();
+
+      set({
+        availableModels: models,
+        isLoadingModels: false,
+      });
+
+      // Cache models to localStorage
+      saveModelsToCache(models);
+    } catch (err) {
+      console.error('[ChatStore] Failed to fetch models:', err);
+      set({ isLoadingModels: false });
+
+      // If fetch fails and we have no cached models, use fallback from provider
+      const { availableModels } = get();
+      if (availableModels.length === 0) {
+        const fallbackModels = await defaultProvider.listModels();
+        set({ availableModels: fallbackModels });
+        saveModelsToCache(fallbackModels);
+      }
+    }
   },
 
   // ========================================================================
