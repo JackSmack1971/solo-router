@@ -8,7 +8,7 @@ import type { Conversation, AppSettings } from '../types';
 
 /**
  * Storage keys for localStorage
- * CRITICAL: API key is NEVER stored in localStorage
+ * NOTE: API key MAY be stored in localStorage if user explicitly opts in
  */
 export const STORAGE_KEYS = {
   CONVERSATIONS: 'solo_router_conversations_v1',
@@ -16,10 +16,15 @@ export const STORAGE_KEYS = {
 } as const;
 
 /**
- * Session storage key for API key
- * Separate constant to emphasize security constraint
+ * Session storage key for API key (default, cleared on browser close)
  */
 const API_KEY_SESSION_KEY = 'solo_router_openrouter_api_key';
+
+/**
+ * LocalStorage key for API key (optional, persistent across sessions)
+ * Only used when user explicitly chooses "Remember key on this device"
+ */
+const API_KEY_LOCAL_KEY = 'solo_router_openrouter_api_key_local';
 
 // ============================================================================
 // Conversation Storage (localStorage)
@@ -167,29 +172,55 @@ export function clearSettings(): void {
 }
 
 // ============================================================================
-// API Key Storage (sessionStorage ONLY)
+// API Key Storage (sessionStorage by default, localStorage if persist=true)
 // ============================================================================
 
 /**
- * Save OpenRouter API key to sessionStorage
- * CRITICAL: Never use localStorage for API keys
- * The key will be cleared when the browser session ends
+ * Save OpenRouter API key to storage
+ * @param key - The API key to save
+ * @param persist - If true, save to localStorage (persists across sessions)
+ *                  If false, save to sessionStorage (cleared on browser close)
+ *
+ * SECURITY NOTE: Persisting to localStorage is optional and requires explicit user consent
  */
-export function saveApiKey(key: string): void {
+export function saveApiKey(key: string, persist: boolean = false): void {
   try {
-    sessionStorage.setItem(API_KEY_SESSION_KEY, key);
+    if (persist) {
+      // User opted to persist - save to localStorage
+      localStorage.setItem(API_KEY_LOCAL_KEY, key);
+      // Clear from sessionStorage to avoid duplication
+      sessionStorage.removeItem(API_KEY_SESSION_KEY);
+    } else {
+      // Default: save to sessionStorage only
+      sessionStorage.setItem(API_KEY_SESSION_KEY, key);
+      // Clear from localStorage to ensure we don't have stale persistent key
+      localStorage.removeItem(API_KEY_LOCAL_KEY);
+    }
   } catch {
     console.error('[Storage] Failed to save API key (will not be logged)');
   }
 }
 
 /**
- * Retrieve OpenRouter API key from sessionStorage
- * Returns null if not found
+ * Retrieve OpenRouter API key from storage
+ * Checks sessionStorage first (temporary), then localStorage (persistent)
+ * Returns null if not found in either location
  */
 export function getApiKey(): string | null {
   try {
-    return sessionStorage.getItem(API_KEY_SESSION_KEY);
+    // Check sessionStorage first (takes precedence)
+    const sessionKey = sessionStorage.getItem(API_KEY_SESSION_KEY);
+    if (sessionKey) {
+      return sessionKey;
+    }
+
+    // Fall back to localStorage (persistent key if user opted in)
+    const localKey = localStorage.getItem(API_KEY_LOCAL_KEY);
+    if (localKey) {
+      return localKey;
+    }
+
+    return null;
   } catch {
     console.error('[Storage] Failed to retrieve API key');
     return null;
@@ -197,12 +228,13 @@ export function getApiKey(): string | null {
 }
 
 /**
- * Clear API key from sessionStorage
+ * Clear API key from both sessionStorage and localStorage
  * Call this on logout or when user wants to switch keys
  */
 export function clearApiKey(): void {
   try {
     sessionStorage.removeItem(API_KEY_SESSION_KEY);
+    localStorage.removeItem(API_KEY_LOCAL_KEY);
   } catch {
     console.error('[Storage] Failed to clear API key');
   }
@@ -216,17 +248,32 @@ export function hasApiKey(): boolean {
   return getApiKey() !== null;
 }
 
+/**
+ * Check if the API key is currently persisted in localStorage
+ * Returns true if key is saved persistently, false if in sessionStorage or not saved
+ */
+export function isApiKeyPersisted(): boolean {
+  try {
+    return localStorage.getItem(API_KEY_LOCAL_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
 // ============================================================================
 // Storage Size Utilities
 // ============================================================================
 
 /**
  * Estimate the size of stored data in bytes
+ * Includes conversations, settings, and persisted API key (if any)
  * Useful for warning users about storage limits
  */
 export function estimateStorageSize(): number {
   try {
     let total = 0;
+
+    // Count standard storage keys
     for (const key in STORAGE_KEYS) {
       const value = localStorage.getItem(STORAGE_KEYS[key as keyof typeof STORAGE_KEYS]);
       if (value) {
@@ -234,6 +281,13 @@ export function estimateStorageSize(): number {
         total += value.length * 2;
       }
     }
+
+    // Include persisted API key if it exists
+    const persistedKey = localStorage.getItem(API_KEY_LOCAL_KEY);
+    if (persistedKey) {
+      total += persistedKey.length * 2;
+    }
+
     return total;
   } catch {
     return 0;
