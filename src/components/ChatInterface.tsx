@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, StopCircle, AlertCircle, X, Settings, SlidersHorizontal } from 'lucide-react';
+import { Send, StopCircle, AlertCircle, X, Settings, SlidersHorizontal, CheckCircle2 } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { MessageList } from './MessageList';
 import { ConversationSettingsModal } from './ConversationSettingsModal';
@@ -23,6 +23,7 @@ interface ChatInterfaceProps {
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) => {
   const [input, setInput] = useState('');
   const [isConversationSettingsOpen, setIsConversationSettingsOpen] = useState(false);
+  const [showSavedIndicator, setShowSavedIndicator] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Connect to store
@@ -35,6 +36,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   const error = useChatStore((state) => state.error);
   const clearError = useChatStore((state) => state.clearError);
   const availableModels = useChatStore((state) => state.availableModels);
+  const lastSaved = useChatStore((state) => state.lastSaved);
 
   /**
    * Focus input on mount and after sending messages
@@ -42,6 +44,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   useEffect(() => {
     inputRef.current?.focus();
   }, [activeConversation?.id]);
+
+  /**
+   * Show "Saved" indicator when lastSaved changes
+   */
+  useEffect(() => {
+    if (lastSaved !== null) {
+      setShowSavedIndicator(true);
+      // Hide after 3 seconds
+      const timer = setTimeout(() => {
+        setShowSavedIndicator(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [lastSaved]);
 
   /**
    * Handle send message
@@ -180,9 +196,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
           <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {activeConversation.title}
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {activeConversation.model}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              {activeConversation.model}
+            </p>
+            {/* Saved indicator */}
+            {showSavedIndicator && (
+              <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 animate-fade-in">
+                <CheckCircle2 size={12} className="text-green-600 dark:text-green-400" />
+                <span>Saved</span>
+              </div>
+            )}
+          </div>
         </div>
         <button
           onClick={() => setIsConversationSettingsOpen(true)}
@@ -233,6 +258,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
         isGenerating={isGenerating}
         onRegenerate={handleRegenerate}
         onEditMessage={handleEditMessage}
+        onSendMessage={sendMessage}
       />
 
       {/* Input Area - FR-008 Mobile Keyboard Support */}

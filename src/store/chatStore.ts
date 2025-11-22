@@ -29,6 +29,7 @@ interface ChatStore {
   error: string | null;
   availableModels: ModelSummary[];
   isLoadingModels: boolean;
+  lastSaved: number | null;
 
   // Conversation Management
   createConversation: (title?: string) => string;
@@ -166,6 +167,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   error: null,
   availableModels: loadModelsFromCache(),
   isLoadingModels: false,
+  lastSaved: null,
 
   // ========================================================================
   // Conversation Management
@@ -872,6 +874,8 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
   saveToStorage: () => {
     const { conversations } = get();
     saveConversations(conversations);
+    // Update lastSaved timestamp after successful save
+    set({ lastSaved: Date.now() });
   },
 
   // ========================================================================

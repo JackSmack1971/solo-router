@@ -255,15 +255,41 @@ const LoadingIndicator: React.FC = () => (
 /**
  * Empty state component (shown when no messages)
  */
-const EmptyState: React.FC = () => (
-  <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
-    <div className="text-6xl mb-4">💬</div>
-    <h2 className="text-xl font-semibold mb-2">Start a conversation</h2>
-    <p className="text-sm text-center max-w-md">
-      Type a message below to begin chatting with your selected AI model.
-    </p>
-  </div>
-);
+interface EmptyStateProps {
+  onSendMessage?: (content: string) => void;
+}
+
+const EmptyState: React.FC<EmptyStateProps> = ({ onSendMessage }) => {
+  const starterPrompts = [
+    "Explain quantum computing like I'm 5",
+    "Debug a React useEffect hook",
+    "Write a Python script to parse CSV",
+    "Help me understand async/await in JavaScript",
+  ];
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 px-4">
+      <div className="text-6xl mb-4">💬</div>
+      <h2 className="text-xl font-semibold mb-2">Start a conversation</h2>
+      <p className="text-sm text-center max-w-md mb-6">
+        Type a message below or try one of these prompts:
+      </p>
+
+      {/* Starter Prompts */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl w-full">
+        {starterPrompts.map((prompt, index) => (
+          <button
+            key={index}
+            onClick={() => onSendMessage?.(prompt)}
+            className="px-4 py-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750 hover:border-blue-400 dark:hover:border-blue-500 transition-colors text-left"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /**
  * MessageList props
@@ -274,6 +300,7 @@ interface MessageListProps {
   isGenerating: boolean;
   onRegenerate?: () => void;
   onEditMessage?: (messageId: string, newContent: string) => void;
+  onSendMessage?: (content: string) => void;
 }
 
 /**
@@ -286,6 +313,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   isGenerating,
   onRegenerate,
   onEditMessage,
+  onSendMessage,
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -343,7 +371,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   // Show empty state if no messages
   if (messages.length === 0) {
-    return <EmptyState />;
+    return <EmptyState onSendMessage={onSendMessage} />;
   }
 
   return (
