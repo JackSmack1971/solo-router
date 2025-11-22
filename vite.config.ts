@@ -1,10 +1,55 @@
 import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
   // @ts-expect-error - Type mismatch due to vite version conflict in node_modules
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      manifest: {
+        name: 'SoloRouter Chat',
+        short_name: 'SoloRouter',
+        description: 'Local-first AI Chat',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
+        display: 'standalone',
+        icons: [
+          {
+            src: '/vite.svg',
+            sizes: '192x192',
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
+          },
+          {
+            src: '/vite.svg',
+            sizes: '512x512',
+            type: 'image/svg+xml',
+            purpose: 'any maskable'
+          }
+        ]
+      },
+      workbox: {
+        // Cache strategy for API calls (network-first for freshness)
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/openrouter\.ai\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'openrouter-api-cache',
+              networkTimeoutSeconds: 10,
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          }
+        ]
+      }
+    })
+  ],
   test: {
     globals: true,
     environment: 'jsdom',
