@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Eye, EyeOff, RefreshCw, Search, ChevronDown, ChevronRight } from 'lucide-react';
-import { getApiKey, saveApiKey, clearApiKey } from '../utils/storage';
+import { getApiKey, saveApiKey, clearApiKey, isApiKeyPersisted, estimateStorageSize } from '../utils/storage';
 import { useChatStore } from '../store/chatStore';
 import { formatPricing } from '../utils/tokenUtils';
 import type { ModelSummary } from '../types';
@@ -40,7 +40,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   // API Key state
   const [apiKey, setApiKey] = useState(() => getApiKey() || '');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [rememberKey, setRememberKey] = useState(() => isApiKeyPersisted());
   const [isSaved, setIsSaved] = useState(false);
+
+  // Storage meter state
+  const [storageSize, setStorageSize] = useState(0);
 
   // Model search state
   const [modelSearch, setModelSearch] = useState('');
@@ -93,6 +97,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
       const timer = setTimeout(() => {
         const key = getApiKey();
         setApiKey(key || '');
+        setRememberKey(isApiKeyPersisted());
         setIsSaved(false);
         setModelSearch('');
         // Update local settings from store
@@ -103,6 +108,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
         setFrequencyPenalty(settings.frequencyPenalty ?? 0.0);
         setPresencePenalty(settings.presencePenalty ?? 0.0);
         setShowAdvanced(false);
+        // Calculate storage size
+        setStorageSize(estimateStorageSize());
       }, 0);
       return () => clearTimeout(timer);
     }
@@ -121,7 +128,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const handleSave = () => {
     // Save API key if provided
     if (apiKey.trim()) {
-      saveApiKey(apiKey.trim());
+      saveApiKey(apiKey.trim(), rememberKey);
     }
 
     // Save app settings
@@ -148,6 +155,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
   const handleClearApiKey = () => {
     clearApiKey();
     setApiKey('');
+    setRememberKey(false);
     setIsSaved(false);
   };
 
@@ -211,9 +219,31 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 {showApiKey ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+
+            {/* Remember Key Checkbox */}
+            <div className="mt-3">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberKey}
+                  onChange={(e) => setRememberKey(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                />
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Remember key on this device
+                </span>
+              </label>
+              {rememberKey && (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-2 rounded border border-amber-200 dark:border-amber-800">
+                  ⚠️ Warning: This saves your API key to browser storage. Do not use on public computers.
+                </p>
+              )}
+            </div>
+
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Your API key is stored in session storage and will be cleared when you close
-              the browser.
+              {rememberKey
+                ? 'Your API key will persist across browser sessions.'
+                : 'Your API key is stored in session storage and will be cleared when you close the browser.'}
             </p>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Get your API key from{' '}
@@ -378,6 +408,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
             />
             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
               Instructions that set the assistant's behavior and personality.
+            </p>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-700" />
+
+          {/* Data Usage Section */}
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Data Usage
+            </h3>
+            <div className="space-y-2">
+              {/* Storage size calculation */}
+              {(() => {
+                const LIMIT_BYTES = 5 * 1024 * 1024; // 5MB
+                const usedMB = (storageSize / (1024 * 1024)).toFixed(2);
+                const limitMB = (LIMIT_BYTES / (1024 * 1024)).toFixed(0);
+                const percentage = Math.min((storageSize / LIMIT_BYTES) * 100, 100);
+
+                return (
+                  <>
+                    <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">
+                      <span>Used: {usedMB} MB / ~{limitMB} MB</span>
+                      <span>{percentage.toFixed(1)}%</span>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className={`h-2.5 rounded-full transition-all ${
+                          percentage > 80
+                            ? 'bg-red-600'
+                            : percentage > 60
+                            ? 'bg-amber-500'
+                            : 'bg-blue-600'
+                        }`}
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    {percentage > 80 && (
+                      <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                        Storage is nearing limit. Consider exporting and clearing old conversations.
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              Browser localStorage has a typical limit of 5-10MB. This includes conversations, settings, and your API key if persisted.
             </p>
           </div>
 
