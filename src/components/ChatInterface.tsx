@@ -5,9 +5,10 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, StopCircle, AlertCircle, X, Settings } from 'lucide-react';
+import { Send, StopCircle, AlertCircle, X, Settings, SlidersHorizontal } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { MessageList } from './MessageList';
+import { ConversationSettingsModal } from './ConversationSettingsModal';
 
 /**
  * Main chat interface component props
@@ -21,6 +22,7 @@ interface ChatInterfaceProps {
  */
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) => {
   const [input, setInput] = useState('');
+  const [isConversationSettingsOpen, setIsConversationSettingsOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Connect to store
@@ -29,6 +31,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   const sendMessage = useChatStore((state) => state.sendMessage);
   const stopGeneration = useChatStore((state) => state.stopGeneration);
   const deleteMessage = useChatStore((state) => state.deleteMessage);
+  const editMessageAndRegenerate = useChatStore((state) => state.editMessageAndRegenerate);
   const error = useChatStore((state) => state.error);
   const clearError = useChatStore((state) => state.clearError);
   const availableModels = useChatStore((state) => state.availableModels);
@@ -109,6 +112,17 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   };
 
   /**
+   * Handle editing a message and regenerating the response (FR-005)
+   */
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    if (!activeConversation || isGenerating) {
+      return;
+    }
+
+    await editMessageAndRegenerate(activeConversation.id, messageId, newContent);
+  };
+
+  /**
    * Handle keyboard shortcuts (FR-009)
    * - Enter: send message
    * - Shift+Enter: new line
@@ -162,7 +176,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-        <div>
+        <div className="flex-1 min-w-0">
           <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {activeConversation.title}
           </h1>
@@ -170,6 +184,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
             {activeConversation.model}
           </p>
         </div>
+        <button
+          onClick={() => setIsConversationSettingsOpen(true)}
+          className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          aria-label="Tune conversation settings"
+        >
+          <SlidersHorizontal size={18} />
+          <span className="hidden sm:inline">Tune Chat</span>
+        </button>
       </div>
 
       {/* Error Banner - R-001 */}
@@ -210,6 +232,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
         availableModels={availableModels}
         isGenerating={isGenerating}
         onRegenerate={handleRegenerate}
+        onEditMessage={handleEditMessage}
       />
 
       {/* Input Area - FR-008 Mobile Keyboard Support */}
@@ -255,6 +278,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
           Press Enter or Ctrl+Enter to send, Shift+Enter for new line
         </p>
       </div>
+
+      {/* Conversation Settings Modal */}
+      <ConversationSettingsModal
+        isOpen={isConversationSettingsOpen}
+        onClose={() => setIsConversationSettingsOpen(false)}
+        conversation={activeConversation}
+      />
     </div>
   );
 };

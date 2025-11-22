@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Settings, MessageSquare, Menu, X, Download, Upload } from 'lucide-react';
+import { Plus, Trash2, Settings, MessageSquare, Menu, X, Download, Upload, Pencil, Check } from 'lucide-react';
 import { useChatStore } from './store/chatStore';
 import { ChatInterface } from './components/ChatInterface';
 import { SettingsModal } from './components/SettingsModal';
@@ -22,6 +22,7 @@ interface ConversationItemProps {
   isActive: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onRename: (newTitle: string) => void;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = ({
@@ -29,7 +30,103 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
   isActive,
   onSelect,
   onDelete,
+  onRename,
 }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Focus input when entering edit mode
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleStartEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditing(true);
+    setEditedTitle(title);
+  };
+
+  const handleSaveEdit = () => {
+    const trimmed = editedTitle.trim();
+    if (trimmed && trimmed !== title) {
+      onRename(trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedTitle(title);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSaveEdit();
+    } else if (e.key === 'Escape') {
+      handleCancelEdit();
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div
+        className={`group flex items-center gap-2 px-3 py-2 rounded-lg ${
+          isActive
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <MessageSquare size={16} className="flex-shrink-0" />
+        <input
+          ref={inputRef}
+          type="text"
+          value={editedTitle}
+          onChange={(e) => setEditedTitle(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSaveEdit}
+          className={`flex-1 min-w-0 px-2 py-1 text-sm rounded ${
+            isActive
+              ? 'bg-blue-700 text-white placeholder-blue-200'
+              : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+          } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSaveEdit();
+          }}
+          className={`p-1 rounded ${
+            isActive
+              ? 'hover:bg-blue-700'
+              : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+          }`}
+          aria-label="Save title"
+        >
+          <Check size={14} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleCancelEdit();
+          }}
+          className={`p-1 rounded ${
+            isActive
+              ? 'hover:bg-blue-700'
+              : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+          }`}
+          aria-label="Cancel edit"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`group flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
@@ -43,20 +140,33 @@ const ConversationItem: React.FC<ConversationItemProps> = ({
         <MessageSquare size={16} className="flex-shrink-0" />
         <span className="text-sm truncate">{title}</span>
       </div>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className={`opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity ${
-          isActive
-            ? 'hover:bg-blue-700'
-            : 'hover:bg-gray-200 dark:hover:bg-gray-700'
-        }`}
-        aria-label="Delete conversation"
-      >
-        <Trash2 size={14} />
-      </button>
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={handleStartEdit}
+          className={`p-1 rounded ${
+            isActive
+              ? 'hover:bg-blue-700'
+              : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+          }`}
+          aria-label="Edit title"
+        >
+          <Pencil size={14} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className={`p-1 rounded ${
+            isActive
+              ? 'hover:bg-blue-700'
+              : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+          }`}
+          aria-label="Delete conversation"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
     </div>
   );
 };
@@ -80,6 +190,7 @@ function App() {
   const createConversation = useChatStore((state) => state.createConversation);
   const setActiveConversation = useChatStore((state) => state.setActiveConversation);
   const deleteConversation = useChatStore((state) => state.deleteConversation);
+  const renameConversation = useChatStore((state) => state.renameConversation);
   const loadFromStorage = useChatStore((state) => state.loadFromStorage);
 
   /**
@@ -242,6 +353,7 @@ function App() {
                   isActive={conv.id === activeConversationId}
                   onSelect={() => setActiveConversation(conv.id)}
                   onDelete={() => handleDeleteConversation(conv.id)}
+                  onRename={(newTitle) => renameConversation(conv.id, newTitle)}
                 />
               ))
             )}

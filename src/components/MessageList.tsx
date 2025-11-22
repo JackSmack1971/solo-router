@@ -6,7 +6,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import { AlertCircle, Copy, RefreshCw, Pencil, Check, X } from 'lucide-react';
 import { Markdown } from './Markdown';
 import type { Message, ModelSummary } from '../types';
 import { calculateCost, formatCost } from '../utils/tokenUtils';
@@ -20,6 +20,7 @@ interface MessageBubbleProps {
   isLastAssistantMessage?: boolean;
   onCopy?: () => void;
   onRegenerate?: () => void;
+  onEdit?: (newContent: string) => void;
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -28,8 +29,12 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   isLastAssistantMessage = false,
   onCopy,
   onRegenerate,
+  onEdit,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedContent, setEditedContent] = useState(message.content);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isUser = message.role === 'user';
   const isError = message.error;
 
@@ -61,6 +66,44 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     onCopy?.();
   };
 
+  /**
+   * Handle entering edit mode
+   */
+  const handleStartEdit = () => {
+    setIsEditing(true);
+    setEditedContent(message.content);
+  };
+
+  /**
+   * Handle saving edited message
+   */
+  const handleSaveEdit = () => {
+    if (editedContent.trim() && editedContent !== message.content) {
+      onEdit?.(editedContent.trim());
+    }
+    setIsEditing(false);
+  };
+
+  /**
+   * Handle canceling edit
+   */
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedContent(message.content);
+  };
+
+  /**
+   * Auto-focus textarea when entering edit mode
+   */
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      // Move cursor to end
+      textareaRef.current.selectionStart = textareaRef.current.value.length;
+      textareaRef.current.selectionEnd = textareaRef.current.value.length;
+    }
+  }, [isEditing]);
+
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 group`}>
       <div
@@ -81,7 +124,49 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
         </div>
 
         {/* Message content */}
-        {isUser ? (
+        {isEditing ? (
+          // Edit mode: show textarea and action buttons
+          <div className="space-y-2">
+            <textarea
+              ref={textareaRef}
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              rows={4}
+              onKeyDown={(e) => {
+                // Ctrl+Enter or Cmd+Enter to save
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                  e.preventDefault();
+                  handleSaveEdit();
+                }
+                // Escape to cancel
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  handleCancelEdit();
+                }
+              }}
+            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSaveEdit}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+              >
+                <Check size={14} />
+                Save & Regenerate
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-100 rounded transition-colors"
+              >
+                <X size={14} />
+                Cancel
+              </button>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                ⚠️ Future messages will be removed
+              </span>
+            </div>
+          </div>
+        ) : isUser ? (
           // User messages: plain text with line breaks
           <div className="whitespace-pre-wrap break-words">{message.content}</div>
         ) : (
@@ -101,29 +186,48 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         )}
 
-        {/* Action buttons for assistant messages (FR-005) */}
-        {!isUser && (
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-              aria-label="Copy message"
-            >
-              <Copy size={14} />
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-
-            {isLastAssistantMessage && onRegenerate && (
-              <button
-                onClick={onRegenerate}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                aria-label="Regenerate response"
-              >
-                <RefreshCw size={14} />
-                Regenerate
-              </button>
+        {/* Action buttons */}
+        {!isEditing && (
+          <>
+            {/* User message actions (FR-005) */}
+            {isUser && onEdit && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-blue-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={handleStartEdit}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-white hover:text-blue-100 transition-colors rounded hover:bg-blue-700"
+                  aria-label="Edit message"
+                >
+                  <Pencil size={14} />
+                  Edit
+                </button>
+              </div>
             )}
-          </div>
+
+            {/* Assistant message actions */}
+            {!isUser && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={handleCopy}
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                  aria-label="Copy message"
+                >
+                  <Copy size={14} />
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+
+                {isLastAssistantMessage && onRegenerate && (
+                  <button
+                    onClick={onRegenerate}
+                    className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                    aria-label="Regenerate response"
+                  >
+                    <RefreshCw size={14} />
+                    Regenerate
+                  </button>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -169,6 +273,7 @@ interface MessageListProps {
   availableModels: ModelSummary[];
   isGenerating: boolean;
   onRegenerate?: () => void;
+  onEditMessage?: (messageId: string, newContent: string) => void;
 }
 
 /**
@@ -180,6 +285,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   availableModels,
   isGenerating,
   onRegenerate,
+  onEditMessage,
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
@@ -271,6 +377,11 @@ export const MessageList: React.FC<MessageListProps> = ({
                   message.role === 'assistant' && virtualItem.index === lastAssistantMessageIndex
                 }
                 onRegenerate={onRegenerate}
+                onEdit={
+                  message.role === 'user'
+                    ? (newContent) => onEditMessage?.(message.id, newContent)
+                    : undefined
+                }
               />
             </div>
           );
