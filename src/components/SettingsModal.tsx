@@ -122,6 +122,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
     }
   }, [isOpen, availableModels.length, isLoadingModels, fetchModels]);
 
+  // Focus trap: keep focus within modal when open
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      const modal = document.querySelector('[role="dialog"]');
+      if (!modal) return;
+
+      const focusableElements = modal.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      const focusableArray = Array.from(focusableElements);
+      const firstElement = focusableArray[0];
+      const lastElement = focusableArray[focusableArray.length - 1];
+
+      if (e.shiftKey) {
+        // Shift+Tab: if on first element, move to last
+        if (document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        }
+      } else {
+        // Tab: if on last element, move to first
+        if (document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   /**
    * Handle save button click
    */
@@ -175,10 +211,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          <h2 id="settings-modal-title" className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             Settings
           </h2>
           <button

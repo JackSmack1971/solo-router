@@ -6,10 +6,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertCircle, Copy, RefreshCw, Pencil, Check, X, Info } from 'lucide-react';
+import { AlertCircle, Copy, RefreshCw, Pencil, Check, X, Info, ArrowDown } from 'lucide-react';
 import { Markdown } from './Markdown';
 import type { Message, ModelSummary } from '../types';
 import { calculateCost, formatCost } from '../utils/tokenUtils';
+import { useToastStore } from '../store/toastStore';
 
 /**
  * Individual message bubble component
@@ -31,10 +32,10 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   onRegenerate,
   onEdit,
 }) => {
-  const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(message.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const toast = useToastStore();
   const isUser = message.role === 'user';
   const isError = message.error;
 
@@ -60,8 +61,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
    */
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      toast.success('Copied to clipboard');
     });
     onCopy?.();
   };
@@ -213,7 +213,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
                   aria-label="Copy message"
                 >
                   <Copy size={14} />
-                  {copied ? 'Copied!' : 'Copy'}
+                  Copy
                 </button>
 
                 {isLastAssistantMessage && onRegenerate && (
@@ -370,13 +370,25 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [messages, shouldAutoScroll]);
 
+  /**
+   * Manually scroll to bottom (for scroll-to-bottom button)
+   */
+  const scrollToBottom = () => {
+    if (parentRef.current) {
+      parentRef.current.scrollTo({
+        top: parentRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  };
+
   // Show empty state if no messages
   if (messages.length === 0) {
     return <EmptyState onSendMessage={onSendMessage} />;
   }
 
   return (
-    <div ref={parentRef} className="flex-1 overflow-y-auto px-6 py-4">
+    <div ref={parentRef} className="flex-1 overflow-y-auto px-6 py-4 relative">
       <div
         style={{
           height: `${virtualizer.getTotalSize()}px`,
@@ -419,6 +431,18 @@ export const MessageList: React.FC<MessageListProps> = ({
 
       {/* Loading Indicator - Phase 6 */}
       {showLoadingIndicator && <LoadingIndicator />}
+
+      {/* Scroll to bottom button - Phase 15 */}
+      {!shouldAutoScroll && isGenerating && (
+        <button
+          onClick={scrollToBottom}
+          className="fixed bottom-24 right-8 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-2 transition-all animate-fade-in z-10"
+          aria-label="Scroll to new messages"
+        >
+          <ArrowDown size={16} />
+          <span className="text-sm font-medium">New messages</span>
+        </button>
+      )}
     </div>
   );
 };
