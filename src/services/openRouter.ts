@@ -5,7 +5,6 @@
  */
 
 import type {
-  Message,
   ModelSummary,
   StreamParams,
   ChatProvider,
@@ -35,16 +34,6 @@ export class ApiError extends Error {
     this.status = status;
     this.body = body;
   }
-}
-
-/**
- * Convert internal Message format to OpenRouter API format
- */
-function formatMessagesForApi(messages: Message[]): Array<{ role: string; content: string }> {
-  return messages.map((msg) => ({
-    role: msg.role,
-    content: msg.content,
-  }));
 }
 
 /**
@@ -97,9 +86,10 @@ export class OpenRouterProvider implements ChatProvider {
     }
 
     // Prepare the request body
+    // Messages are already formatted with system prompt included
     const requestBody: OpenRouterChatRequest = {
       model: params.model,
-      messages: formatMessagesForApi(params.messages),
+      messages: params.messages,
       stream: true,
       temperature: params.settings.temperature,
       max_tokens: params.settings.maxTokens,
@@ -114,14 +104,6 @@ export class OpenRouterProvider implements ChatProvider {
     }
     if (params.settings.presencePenalty !== undefined) {
       requestBody.presence_penalty = params.settings.presencePenalty;
-    }
-
-    // Add system prompt if provided
-    if (params.settings.systemPrompt) {
-      requestBody.messages.unshift({
-        role: 'system',
-        content: params.settings.systemPrompt,
-      });
     }
 
     try {

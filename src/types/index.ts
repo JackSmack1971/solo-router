@@ -90,14 +90,14 @@ export interface ModelSummary {
 
 /**
  * Parameters for streaming chat requests
+ * Messages should be pre-formatted with system prompt already included
  */
 export interface StreamParams {
-  messages: Message[];
+  messages: Array<{ role: string; content: string }>;
   model: string;
   settings: {
     temperature: number;
     maxTokens: number;
-    systemPrompt?: string | null;
     topP?: number;
     frequencyPenalty?: number;
     presencePenalty?: number;

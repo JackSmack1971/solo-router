@@ -14,7 +14,7 @@ import {
   DEFAULT_SETTINGS,
 } from '../utils/storage';
 import { defaultProvider } from '../services/openRouter';
-import { estimateConversationTokens, isNearContextLimit } from '../utils/tokenUtils';
+import { estimateConversationTokens, isNearContextLimit, prepareMessagesForApi } from '../utils/tokenUtils';
 
 /**
  * Chat store state interface
@@ -450,7 +450,13 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       }
 
       // Prepare messages for API (exclude the empty assistant message we just added)
-      const messagesForApi = convWithPlaceholder.messages.slice(0, -1);
+      const messagesWithoutPlaceholder = convWithPlaceholder.messages.slice(0, -1);
+
+      // Prepare messages with system prompt for API
+      const messagesForApi = prepareMessagesForApi(
+        messagesWithoutPlaceholder,
+        updatedConv.settings.systemPrompt
+      );
 
       await defaultProvider.streamChat({
         messages: messagesForApi,
@@ -458,7 +464,6 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         settings: {
           temperature: updatedConv.settings.temperature,
           maxTokens: updatedConv.settings.maxTokens,
-          systemPrompt: updatedConv.settings.systemPrompt,
           topP: updatedConv.settings.topP,
           frequencyPenalty: updatedConv.settings.frequencyPenalty,
           presencePenalty: updatedConv.settings.presencePenalty,
@@ -630,11 +635,11 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       }
 
       // Prepare messages for API (exclude the empty assistant message we just added)
-      const messagesForApi = updatedConv.messages.slice(0, -1);
+      const messagesWithoutPlaceholder = updatedConv.messages.slice(0, -1);
 
       // Context window safety check
       const estimatedTokens = estimateConversationTokens(
-        messagesForApi.map((m) => ({ role: m.role, content: m.content })),
+        messagesWithoutPlaceholder.map((m) => ({ role: m.role, content: m.content })),
         updatedConv.settings.systemPrompt
       );
 
@@ -657,13 +662,18 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         }, 5000);
       }
 
+      // Prepare messages with system prompt for API
+      const messagesForApi = prepareMessagesForApi(
+        messagesWithoutPlaceholder,
+        updatedConv.settings.systemPrompt
+      );
+
       await defaultProvider.streamChat({
         messages: messagesForApi,
         model: activeConv.model,
         settings: {
           temperature: activeConv.settings.temperature,
           maxTokens: activeConv.settings.maxTokens,
-          systemPrompt: activeConv.settings.systemPrompt,
           topP: activeConv.settings.topP,
           frequencyPenalty: activeConv.settings.frequencyPenalty,
           presencePenalty: activeConv.settings.presencePenalty,
