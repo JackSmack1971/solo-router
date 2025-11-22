@@ -107,6 +107,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   temperature: 0.7,
   maxTokens: 2048,
   systemPrompt: null,
+  topP: 1.0,
+  frequencyPenalty: 0.0,
+  presencePenalty: 0.0,
 };
 
 /**

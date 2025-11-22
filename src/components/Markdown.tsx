@@ -92,13 +92,28 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({ content, classNam
     // CRITICAL: Never skip sanitization for user or model-generated content
     const cleanHtml = DOMPurify.sanitize(rawHtml, {
       // Allow code blocks with class attributes for syntax highlighting
-      ADD_ATTR: ['class', 'data-code'],
+      ADD_ATTR: ['class', 'data-code', 'target', 'rel'],
       // Allow target="_blank" for links
       ADD_TAGS: ['iframe'],
       ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.-]+(?:[^a-z+.:-]|$))/i,
     });
 
-    return cleanHtml;
+    // Post-process to add security attributes to external links
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = cleanHtml;
+
+    // Add target="_blank" and rel="noopener noreferrer" to all links
+    const links = tempDiv.querySelectorAll('a[href]');
+    links.forEach((link) => {
+      const href = link.getAttribute('href');
+      // Only add for external links (http/https)
+      if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+      }
+    });
+
+    return tempDiv.innerHTML;
   }, [content]);
 
   // Add copy buttons to code blocks after rendering
@@ -148,7 +163,7 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({ content, classNam
   return (
     <div
       ref={containerRef}
-      className={`prose prose-slate max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-100 ${className}`}
+      className={`prose prose-slate max-w-none dark:prose-invert prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-table:border-collapse prose-th:border prose-th:border-gray-300 dark:prose-th:border-gray-600 prose-th:bg-gray-100 dark:prose-th:bg-gray-800 prose-th:px-4 prose-th:py-2 prose-td:border prose-td:border-gray-300 dark:prose-td:border-gray-600 prose-td:px-4 prose-td:py-2 ${className}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

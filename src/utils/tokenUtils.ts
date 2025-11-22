@@ -94,3 +94,53 @@ export function estimateTokenCount(text: string): number {
   // This is a simplification and varies by model and language
   return Math.ceil(text.length / 4);
 }
+
+/**
+ * Estimate total tokens for a conversation's messages
+ * Includes system prompt, all messages, and overhead
+ *
+ * @param messages - Array of messages to estimate tokens for
+ * @param systemPrompt - Optional system prompt
+ * @returns Estimated total token count
+ */
+export function estimateConversationTokens(
+  messages: Array<{ role: string; content: string }>,
+  systemPrompt?: string | null
+): number {
+  let total = 0;
+
+  // Add system prompt tokens if present
+  if (systemPrompt) {
+    total += estimateTokenCount(systemPrompt);
+    // Add overhead for system message formatting (~4 tokens)
+    total += 4;
+  }
+
+  // Add tokens for each message
+  for (const msg of messages) {
+    total += estimateTokenCount(msg.content);
+    // Add overhead for message formatting (~4 tokens per message)
+    total += 4;
+  }
+
+  // Add overhead for API formatting (~3 tokens)
+  total += 3;
+
+  return total;
+}
+
+/**
+ * Check if estimated tokens exceed a percentage of the model's context window
+ *
+ * @param estimatedTokens - Estimated token count
+ * @param modelContextLength - Model's context window size
+ * @param threshold - Percentage threshold (0.0 to 1.0), defaults to 0.9 (90%)
+ * @returns True if estimated tokens exceed threshold
+ */
+export function isNearContextLimit(
+  estimatedTokens: number,
+  modelContextLength: number,
+  threshold: number = 0.9
+): boolean {
+  return estimatedTokens > modelContextLength * threshold;
+}
