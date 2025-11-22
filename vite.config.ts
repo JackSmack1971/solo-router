@@ -63,6 +63,12 @@ export default defineConfig({
         '**/*.test.tsx',
         '**/__tests__/**',
       ],
+      thresholds: {
+        lines: 60,
+        functions: 60,
+        branches: 50,
+        statements: 60,
+      },
     },
   },
 })
