@@ -1,0 +1,256 @@
+/**
+ * MessageList component with virtualization
+ * Handles efficient rendering of long message lists
+ * Based on CODING_STANDARDS.md Section 11 (Performance)
+ */
+
+import React, { useState, useRef, useEffect } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
+import { Markdown } from './Markdown';
+import type { Message } from '../types';
+
+/**
+ * Individual message bubble component
+ */
+interface MessageBubbleProps {
+  message: Message;
+  isLastAssistantMessage?: boolean;
+  onCopy?: () => void;
+  onRegenerate?: () => void;
+}
+
+const MessageBubble: React.FC<MessageBubbleProps> = ({
+  message,
+  isLastAssistantMessage = false,
+  onCopy,
+  onRegenerate,
+}) => {
+  const [copied, setCopied] = useState(false);
+  const isUser = message.role === 'user';
+  const isError = message.error;
+
+  /**
+   * Handle copy to clipboard
+   */
+  const handleCopy = () => {
+    navigator.clipboard.writeText(message.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+    onCopy?.();
+  };
+
+  return (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 group`}>
+      <div
+        className={`max-w-[80%] rounded-lg px-4 py-3 ${
+          isUser
+            ? 'bg-blue-600 text-white'
+            : isError
+            ? 'bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700'
+            : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+        } relative`}
+      >
+        {/* Message metadata */}
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-medium opacity-70">
+            {isUser ? 'You' : message.model || 'Assistant'}
+          </span>
+          {isError && <AlertCircle size={14} className="text-red-600 dark:text-red-400" />}
+        </div>
+
+        {/* Message content */}
+        {isUser ? (
+          // User messages: plain text with line breaks
+          <div className="whitespace-pre-wrap break-words">{message.content}</div>
+        ) : (
+          // Assistant messages: rendered markdown
+          <Markdown content={message.content} className={isError ? 'prose-p:text-red-900 dark:prose-p:text-red-100' : ''} />
+        )}
+
+        {/* Token count (if available) */}
+        {message.tokenCount && (
+          <div className="mt-2 text-xs opacity-60">
+            {message.tokenCount.toLocaleString()} tokens
+          </div>
+        )}
+
+        {/* Action buttons for assistant messages (FR-005) */}
+        {!isUser && (
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+              aria-label="Copy message"
+            >
+              <Copy size={14} />
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+
+            {isLastAssistantMessage && onRegenerate && (
+              <button
+                onClick={onRegenerate}
+                className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                aria-label="Regenerate response"
+              >
+                <RefreshCw size={14} />
+                Regenerate
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Loading indicator component
+ */
+const LoadingIndicator: React.FC = () => (
+  <div className="flex justify-start mb-4">
+    <div className="max-w-[80%] rounded-lg px-4 py-3 bg-gray-100 dark:bg-gray-800">
+      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+        <div className="flex gap-1">
+          <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></span>
+          <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></span>
+          <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></span>
+        </div>
+        <span className="text-sm">Waiting for response...</span>
+      </div>
+    </div>
+  </div>
+);
+
+/**
+ * Empty state component (shown when no messages)
+ */
+const EmptyState: React.FC = () => (
+  <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
+    <div className="text-6xl mb-4">💬</div>
+    <h2 className="text-xl font-semibold mb-2">Start a conversation</h2>
+    <p className="text-sm text-center max-w-md">
+      Type a message below to begin chatting with your selected AI model.
+    </p>
+  </div>
+);
+
+/**
+ * MessageList props
+ */
+interface MessageListProps {
+  messages: Message[];
+  isGenerating: boolean;
+  onRegenerate?: () => void;
+}
+
+/**
+ * MessageList component with virtualization
+ * Efficiently renders long message lists while maintaining auto-scroll behavior
+ */
+export const MessageList: React.FC<MessageListProps> = ({
+  messages,
+  isGenerating,
+  onRegenerate,
+}) => {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+
+  // Find the last assistant message index
+  let lastAssistantMessageIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant') {
+      lastAssistantMessageIndex = i;
+      break;
+    }
+  }
+
+  // Show loading indicator when generating and last message is from user
+  const showLoadingIndicator = isGenerating && messages.length > 0 && messages[messages.length - 1]?.role === 'user';
+
+  // Create virtualizer
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 100, // Estimated height of each message
+    overscan: 5, // Render 5 extra items above and below viewport
+  });
+
+  /**
+   * Track scroll position to determine if we should auto-scroll
+   */
+  useEffect(() => {
+    const parent = parentRef.current;
+    if (!parent) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = parent;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100; // Within 100px of bottom
+      setShouldAutoScroll(isNearBottom);
+    };
+
+    parent.addEventListener('scroll', handleScroll);
+    return () => parent.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  /**
+   * Auto-scroll to bottom when new messages arrive or content changes
+   * Only if user is already at/near the bottom
+   */
+  useEffect(() => {
+    if (shouldAutoScroll && parentRef.current) {
+      // Scroll to bottom
+      parentRef.current.scrollTo({
+        top: parentRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [messages, shouldAutoScroll]);
+
+  // Show empty state if no messages
+  if (messages.length === 0) {
+    return <EmptyState />;
+  }
+
+  return (
+    <div ref={parentRef} className="flex-1 overflow-y-auto px-6 py-4">
+      <div
+        style={{
+          height: `${virtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {virtualizer.getVirtualItems().map((virtualItem) => {
+          const message = messages[virtualItem.index];
+          return (
+            <div
+              key={virtualItem.key}
+              data-index={virtualItem.index}
+              ref={virtualizer.measureElement}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${virtualItem.start}px)`,
+              }}
+            >
+              <MessageBubble
+                message={message}
+                isLastAssistantMessage={
+                  message.role === 'assistant' && virtualItem.index === lastAssistantMessageIndex
+                }
+                onRegenerate={onRegenerate}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Loading Indicator - Phase 6 */}
+      {showLoadingIndicator && <LoadingIndicator />}
+    </div>
+  );
+};

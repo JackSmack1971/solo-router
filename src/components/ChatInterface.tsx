@@ -5,118 +5,9 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, StopCircle, AlertCircle, Copy, RefreshCw, X, Settings } from 'lucide-react';
+import { Send, StopCircle, AlertCircle, X, Settings } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
-import { Markdown } from './Markdown';
-import type { Message } from '../types';
-
-/**
- * Individual message bubble component
- */
-interface MessageBubbleProps {
-  message: Message;
-  isLastAssistantMessage?: boolean;
-  onCopy?: () => void;
-  onRegenerate?: () => void;
-}
-
-const MessageBubble: React.FC<MessageBubbleProps> = ({
-  message,
-  isLastAssistantMessage = false,
-  onCopy,
-  onRegenerate,
-}) => {
-  const [copied, setCopied] = useState(false);
-  const isUser = message.role === 'user';
-  const isError = message.error;
-
-  /**
-   * Handle copy to clipboard
-   */
-  const handleCopy = () => {
-    navigator.clipboard.writeText(message.content).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-    onCopy?.();
-  };
-
-  return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4 group`}>
-      <div
-        className={`max-w-[80%] rounded-lg px-4 py-3 ${
-          isUser
-            ? 'bg-blue-600 text-white'
-            : isError
-            ? 'bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700'
-            : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-        } relative`}
-      >
-        {/* Message metadata */}
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xs font-medium opacity-70">
-            {isUser ? 'You' : message.model || 'Assistant'}
-          </span>
-          {isError && <AlertCircle size={14} className="text-red-600 dark:text-red-400" />}
-        </div>
-
-        {/* Message content */}
-        {isUser ? (
-          // User messages: plain text with line breaks
-          <div className="whitespace-pre-wrap break-words">{message.content}</div>
-        ) : (
-          // Assistant messages: rendered markdown
-          <Markdown content={message.content} className={isError ? 'prose-p:text-red-900 dark:prose-p:text-red-100' : ''} />
-        )}
-
-        {/* Token count (if available) */}
-        {message.tokenCount && (
-          <div className="mt-2 text-xs opacity-60">
-            {message.tokenCount.toLocaleString()} tokens
-          </div>
-        )}
-
-        {/* Action buttons for assistant messages (FR-005) */}
-        {!isUser && (
-          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-              aria-label="Copy message"
-            >
-              <Copy size={14} />
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-
-            {isLastAssistantMessage && onRegenerate && (
-              <button
-                onClick={onRegenerate}
-                className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                aria-label="Regenerate response"
-              >
-                <RefreshCw size={14} />
-                Regenerate
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-/**
- * Empty state component (shown when no messages)
- */
-const EmptyState: React.FC = () => (
-  <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400">
-    <div className="text-6xl mb-4">💬</div>
-    <h2 className="text-xl font-semibold mb-2">Start a conversation</h2>
-    <p className="text-sm text-center max-w-md">
-      Type a message below to begin chatting with your selected AI model.
-    </p>
-  </div>
-);
+import { MessageList } from './MessageList';
 
 /**
  * Main chat interface component props
@@ -130,7 +21,6 @@ interface ChatInterfaceProps {
  */
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) => {
   const [input, setInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Connect to store
@@ -143,14 +33,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   const clearError = useChatStore((state) => state.clearError);
 
   /**
-   * Auto-scroll to bottom when new messages arrive
-   */
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeConversation?.messages]);
-
-  /**
-   * Focus input on mount
+   * Focus input on mount and after sending messages
    */
   useEffect(() => {
     inputRef.current?.focus();
@@ -169,6 +52,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
 
     // Send message through store
     await sendMessage(message);
+
+    // Refocus input after sending (A11y requirement)
+    inputRef.current?.focus();
   };
 
   /**
@@ -270,16 +156,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   }
 
   const messages = activeConversation.messages;
-  const hasMessages = messages.length > 0;
-
-  // Find the last assistant message index
-  let lastAssistantMessageIndex = -1;
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === 'assistant') {
-      lastAssistantMessageIndex = i;
-      break;
-    }
-  }
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
@@ -327,43 +203,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
-        {hasMessages ? (
-          <>
-            {messages.map((message, index) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                isLastAssistantMessage={
-                  message.role === 'assistant' && index === lastAssistantMessageIndex
-                }
-                onRegenerate={handleRegenerate}
-              />
-            ))}
-
-            {/* Loading Indicator - Phase 6 */}
-            {isGenerating && messages[messages.length - 1]?.role === 'user' && (
-              <div className="flex justify-start mb-4">
-                <div className="max-w-[80%] rounded-lg px-4 py-3 bg-gray-100 dark:bg-gray-800">
-                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></span>
-                      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></span>
-                      <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></span>
-                    </div>
-                    <span className="text-sm">Waiting for response...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </>
-        ) : (
-          <EmptyState />
-        )}
-      </div>
+      {/* Messages - Now using virtualized MessageList component */}
+      <MessageList
+        messages={messages}
+        isGenerating={isGenerating}
+        onRegenerate={handleRegenerate}
+      />
 
       {/* Input Area - FR-008 Mobile Keyboard Support */}
       <div className="border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 px-4 md:px-6 py-3 md:py-4">
