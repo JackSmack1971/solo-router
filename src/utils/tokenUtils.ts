@@ -4,7 +4,7 @@
  * Based on SPEC.md FR-004
  */
 
-import type { ModelSummary } from '../types';
+import type { ModelSummary, Message } from '../types';
 
 /**
  * Calculate the estimated cost for a given model and token usage
@@ -143,4 +143,33 @@ export function isNearContextLimit(
   threshold: number = 0.9
 ): boolean {
   return estimatedTokens > modelContextLength * threshold;
+}
+
+/**
+ * Prepare messages for API by converting internal Message format to API format
+ * and prepending system prompt if provided
+ *
+ * @param messages - Array of internal Message objects
+ * @param systemPrompt - Optional system prompt to prepend
+ * @returns Array of messages in API format with system prompt prepended if provided
+ */
+export function prepareMessagesForApi(
+  messages: Message[],
+  systemPrompt: string | null | undefined
+): Array<{ role: string; content: string }> {
+  // Convert internal Message objects to API format
+  const apiMessages = messages.map((msg) => ({
+    role: msg.role,
+    content: msg.content,
+  }));
+
+  // Prepend system prompt if provided
+  if (systemPrompt) {
+    apiMessages.unshift({
+      role: 'system',
+      content: systemPrompt,
+    });
+  }
+
+  return apiMessages;
 }

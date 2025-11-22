@@ -39,6 +39,22 @@ marked.setOptions({
   gfm: true, // GitHub Flavored Markdown
 });
 
+/**
+ * Configure DOMPurify to automatically add security attributes to links
+ * Using afterSanitizeAttributes hook for better performance
+ */
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  // Set all external links to open in a new tab with noopener noreferrer
+  if ('target' in node && node.tagName === 'A') {
+    const href = node.getAttribute('href');
+    // Only add for external links (http/https)
+    if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+      node.setAttribute('target', '_blank');
+      node.setAttribute('rel', 'noopener noreferrer');
+    }
+  }
+});
+
 interface MarkdownProps {
   /**
    * The markdown content to render
@@ -90,6 +106,7 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({ content, classNam
 
     // Sanitize HTML to prevent XSS attacks
     // CRITICAL: Never skip sanitization for user or model-generated content
+    // The afterSanitizeAttributes hook will automatically add target="_blank" and rel="noopener noreferrer"
     const cleanHtml = DOMPurify.sanitize(rawHtml, {
       // Allow code blocks with class attributes for syntax highlighting
       ADD_ATTR: ['class', 'data-code', 'target', 'rel'],
@@ -98,22 +115,7 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({ content, classNam
       ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.-]+(?:[^a-z+.:-]|$))/i,
     });
 
-    // Post-process to add security attributes to external links
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = cleanHtml;
-
-    // Add target="_blank" and rel="noopener noreferrer" to all links
-    const links = tempDiv.querySelectorAll('a[href]');
-    links.forEach((link) => {
-      const href = link.getAttribute('href');
-      // Only add for external links (http/https)
-      if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
-        link.setAttribute('target', '_blank');
-        link.setAttribute('rel', 'noopener noreferrer');
-      }
-    });
-
-    return tempDiv.innerHTML;
+    return cleanHtml;
   }, [content]);
 
   // Add copy buttons to code blocks after rendering

@@ -6,7 +6,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { AlertCircle, Copy, RefreshCw, Pencil, Check, X } from 'lucide-react';
+import { AlertCircle, Copy, RefreshCw, Pencil, Check, X, Info } from 'lucide-react';
 import { Markdown } from './Markdown';
 import type { Message, ModelSummary } from '../types';
 import { calculateCost, formatCost } from '../utils/tokenUtils';
@@ -179,8 +179,9 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <div className="mt-2 text-xs opacity-60">
             {message.tokenCount.toLocaleString()} tokens
             {estimatedCost !== null && (
-              <span className="ml-2">
+              <span className="ml-2 inline-flex items-center gap-1" title="Estimated based on token heuristic">
                 • Est. cost: {formatCost(estimatedCost)}
+                <Info size={12} className="opacity-50" />
               </span>
             )}
           </div>
