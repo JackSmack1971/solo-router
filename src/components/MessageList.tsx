@@ -8,13 +8,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle, Copy, RefreshCw } from 'lucide-react';
 import { Markdown } from './Markdown';
-import type { Message } from '../types';
+import type { Message, ModelSummary } from '../types';
+import { calculateCost, formatCost } from '../utils/tokenUtils';
 
 /**
  * Individual message bubble component
  */
 interface MessageBubbleProps {
   message: Message;
+  availableModels: ModelSummary[];
   isLastAssistantMessage?: boolean;
   onCopy?: () => void;
   onRegenerate?: () => void;
@@ -22,6 +24,7 @@ interface MessageBubbleProps {
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
+  availableModels,
   isLastAssistantMessage = false,
   onCopy,
   onRegenerate,
@@ -29,6 +32,23 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const [copied, setCopied] = useState(false);
   const isUser = message.role === 'user';
   const isError = message.error;
+
+  /**
+   * Calculate estimated cost for this message
+   * Since we only have totalTokens, we estimate the split between prompt and completion
+   * For assistant messages, we assume roughly 30% prompt / 70% completion as a heuristic
+   */
+  const estimatedCost = React.useMemo(() => {
+    if (!message.tokenCount || !message.model) {
+      return null;
+    }
+
+    // Rough heuristic: 30% prompt, 70% completion for assistant messages
+    const promptTokens = Math.round(message.tokenCount * 0.3);
+    const completionTokens = Math.round(message.tokenCount * 0.7);
+
+    return calculateCost(message.model, promptTokens, completionTokens, availableModels);
+  }, [message.tokenCount, message.model, availableModels]);
 
   /**
    * Handle copy to clipboard
@@ -69,10 +89,15 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
           <Markdown content={message.content} className={isError ? 'prose-p:text-red-900 dark:prose-p:text-red-100' : ''} />
         )}
 
-        {/* Token count (if available) */}
+        {/* Token count and cost (if available) */}
         {message.tokenCount && (
           <div className="mt-2 text-xs opacity-60">
             {message.tokenCount.toLocaleString()} tokens
+            {estimatedCost !== null && (
+              <span className="ml-2">
+                • Est. cost: {formatCost(estimatedCost)}
+              </span>
+            )}
           </div>
         )}
 
@@ -141,6 +166,7 @@ const EmptyState: React.FC = () => (
  */
 interface MessageListProps {
   messages: Message[];
+  availableModels: ModelSummary[];
   isGenerating: boolean;
   onRegenerate?: () => void;
 }
@@ -151,6 +177,7 @@ interface MessageListProps {
  */
 export const MessageList: React.FC<MessageListProps> = ({
   messages,
+  availableModels,
   isGenerating,
   onRegenerate,
 }) => {
@@ -239,6 +266,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             >
               <MessageBubble
                 message={message}
+                availableModels={availableModels}
                 isLastAssistantMessage={
                   message.role === 'assistant' && virtualItem.index === lastAssistantMessageIndex
                 }

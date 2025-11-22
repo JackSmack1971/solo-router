@@ -31,6 +31,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   const deleteMessage = useChatStore((state) => state.deleteMessage);
   const error = useChatStore((state) => state.error);
   const clearError = useChatStore((state) => state.clearError);
+  const availableModels = useChatStore((state) => state.availableModels);
 
   /**
    * Focus input on mount and after sending messages
@@ -206,6 +207,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
       {/* Messages - Now using virtualized MessageList component */}
       <MessageList
         messages={messages}
+        availableModels={availableModels}
         isGenerating={isGenerating}
         onRegenerate={handleRegenerate}
       />
