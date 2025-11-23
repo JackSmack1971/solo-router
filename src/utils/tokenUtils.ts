@@ -130,6 +130,57 @@ export function estimateConversationTokens(
 }
 
 /**
+ * Prune messages to fit within a model's context window, preserving the most recent history.
+ * The system prompt (first message with role 'system') is always retained when present.
+ *
+ * @param messages - Array of messages in API format
+ * @param contextLength - Optional model context length; if undefined, no pruning occurs
+ * @returns Messages trimmed to fit within the provided context length
+ */
+export function pruneMessagesToFitContext(
+  messages: Array<{ role: string; content: string }>,
+  contextLength?: number
+): Array<{ role: string; content: string }> {
+  if (!contextLength) {
+    return messages;
+  }
+
+  const overheadPerMessage = 4;
+  const apiOverhead = 3;
+  const systemMessage = messages[0]?.role === 'system' ? messages[0] : null;
+  const remainingMessages = systemMessage ? messages.slice(1) : messages.slice();
+
+  const systemTokens = systemMessage
+    ? estimateTokenCount(systemMessage.content) + overheadPerMessage
+    : 0;
+  let remainingBudget = contextLength - apiOverhead - systemTokens;
+
+  if (remainingBudget <= 0) {
+    return systemMessage ? [systemMessage] : [];
+  }
+
+  const selectedMessages: Array<{ role: string; content: string }> = [];
+
+  for (let index = remainingMessages.length - 1; index >= 0; index -= 1) {
+    const message = remainingMessages[index];
+    const messageCost = estimateTokenCount(message.content) + overheadPerMessage;
+
+    if (messageCost > remainingBudget) {
+      continue;
+    }
+
+    remainingBudget -= messageCost;
+    selectedMessages.unshift(message);
+  }
+
+  if (systemMessage) {
+    selectedMessages.unshift(systemMessage);
+  }
+
+  return selectedMessages;
+}
+
+/**
  * Check if estimated tokens exceed a percentage of the model's context window
  *
  * @param estimatedTokens - Estimated token count
