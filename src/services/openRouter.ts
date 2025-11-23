@@ -4,12 +4,12 @@
  * Based on CODING_STANDARDS.md Section 6 and SPEC.md FR-001
  */
 
+import { z } from 'zod';
 import type {
   ModelSummary,
   StreamParams,
   ChatProvider,
   OpenRouterChatRequest,
-  OpenRouterStreamChunk,
   TokenUsage,
 } from '../types';
 import { getApiKey } from '../utils/storage';
@@ -20,6 +20,48 @@ import { getApiKey } from '../utils/storage';
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const CHAT_COMPLETIONS_PATH = '/chat/completions';
 export const MODELS_PATH = '/models';
+
+const StreamUsageSchema = z
+  .object({
+    prompt_tokens: z.number().optional(),
+    completion_tokens: z.number().optional(),
+    total_tokens: z.number().optional(),
+  })
+  .optional();
+
+const StreamChunkSchema = z.object({
+  id: z.string(),
+  choices: z.array(
+    z.object({
+      delta: z.object({
+        content: z.string().optional(),
+        role: z.string().optional(),
+      }),
+      finish_reason: z.string().nullable().optional(),
+      index: z.number(),
+    })
+  ),
+  created: z.number(),
+  model: z.string(),
+  usage: StreamUsageSchema,
+});
+
+const ModelsResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string().optional(),
+      description: z.string().optional(),
+      context_length: z.number().optional(),
+      pricing: z
+        .object({
+          prompt: z.union([z.number(), z.string()]).optional(),
+          completion: z.union([z.number(), z.string()]).optional(),
+        })
+        .optional(),
+    })
+  ),
+});
 
 /**
  * Custom error class for API-related errors
@@ -199,34 +241,41 @@ export class OpenRouterProvider implements ChatProvider {
               return;
             }
 
-            try {
-              const parsed: OpenRouterStreamChunk = JSON.parse(data);
+            const parsedJson = this.safeJsonParse(data);
+            if (!parsedJson) {
+              continue;
+            }
 
-              // Extract content from the delta
-              const content = parsed.choices?.[0]?.delta?.content;
-              if (content) {
-                params.onChunk(content);
-              }
+            const parsedChunk = StreamChunkSchema.safeParse(parsedJson);
+            if (!parsedChunk.success) {
+              console.warn('[OpenRouter] Invalid SSE chunk schema', parsedChunk.error.issues, 'Data:', data);
+              continue;
+            }
 
-              // Store usage information if present
-              if (parsed.usage) {
-                lastUsage = {
-                  promptTokens: parsed.usage.prompt_tokens,
-                  completionTokens: parsed.usage.completion_tokens,
-                  totalTokens: parsed.usage.total_tokens,
-                };
-              }
+            const primaryChoice = parsedChunk.data.choices.at(0);
+            if (!primaryChoice) {
+              console.warn('[OpenRouter] SSE chunk missing choices', data);
+              continue;
+            }
 
-              // Check for finish reason
-              const finishReason = parsed.choices?.[0]?.finish_reason;
-              if (finishReason) {
-                // Stream is complete
-                params.onDone(lastUsage);
-                return;
-              }
-            } catch (parseErr) {
-              console.error('[OpenRouter] Failed to parse SSE chunk:', parseErr, 'Data:', data);
-              // Continue processing other chunks even if one fails
+            const content = primaryChoice.delta.content;
+            if (content) {
+              params.onChunk(content);
+            }
+
+            if (parsedChunk.data.usage) {
+              lastUsage = {
+                promptTokens: parsedChunk.data.usage.prompt_tokens,
+                completionTokens: parsedChunk.data.usage.completion_tokens,
+                totalTokens: parsedChunk.data.usage.total_tokens,
+              };
+            }
+
+            const finishReason = primaryChoice.finish_reason;
+            if (finishReason) {
+              // Stream is complete
+              params.onDone(lastUsage);
+              return;
             }
           }
         }
@@ -264,32 +313,33 @@ export class OpenRouterProvider implements ChatProvider {
         return this.getFallbackModels();
       }
 
-      const data = await response.json();
+      const rawData = (await response.json()) as unknown;
+      const parsedResponse = ModelsResponseSchema.safeParse(rawData);
 
-      if (!data.data || !Array.isArray(data.data)) {
+      if (!parsedResponse.success) {
         console.warn('[OpenRouter] Invalid models response format');
+        console.debug('[OpenRouter] Model schema validation issues', parsedResponse.error.issues);
         return this.getFallbackModels();
       }
 
       // Transform API response to our ModelSummary format
-      return data.data.map((model: {
-        id: string;
-        name?: string;
-        description?: string;
-        context_length?: number;
-        pricing?: { prompt: string; completion: string };
-      }) => ({
-        id: model.id,
-        name: model.name || model.id,
-        description: model.description,
-        contextLength: model.context_length,
-        pricing: model.pricing
-          ? {
-              prompt: parseFloat(model.pricing.prompt) || 0,
-              completion: parseFloat(model.pricing.completion) || 0,
-            }
-          : undefined,
-      }));
+      return parsedResponse.data.data.map((model) => {
+        const promptPrice = this.normalizePricingValue(model.pricing?.prompt) ?? 0;
+        const completionPrice = this.normalizePricingValue(model.pricing?.completion) ?? 0;
+
+        return {
+          id: model.id,
+          name: model.name || model.id,
+          description: model.description,
+          contextLength: model.context_length,
+          pricing: model.pricing
+            ? {
+                prompt: promptPrice,
+                completion: completionPrice,
+              }
+            : undefined,
+        };
+      });
     } catch (err) {
       console.error('[OpenRouter] Error fetching models:', err);
       return this.getFallbackModels();
@@ -333,6 +383,28 @@ export class OpenRouterProvider implements ChatProvider {
         contextLength: 8192,
       },
     ];
+  }
+
+  private safeJsonParse(input: string): unknown | null {
+    try {
+      return JSON.parse(input) as unknown;
+    } catch (error) {
+      console.warn('[OpenRouter] Failed to parse SSE chunk JSON', error);
+      return null;
+    }
+  }
+
+  private normalizePricingValue(value?: number | string): number | undefined {
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : undefined;
+    }
+
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+
+    return undefined;
   }
 }
 
