@@ -110,8 +110,7 @@ export const Markdown: React.FC<MarkdownProps> = React.memo(({ content, classNam
     const cleanHtml = DOMPurify.sanitize(rawHtml, {
       // Allow code blocks with class attributes for syntax highlighting
       ADD_ATTR: ['class', 'data-code', 'target', 'rel'],
-      // Allow target="_blank" for links
-      ADD_TAGS: ['iframe'],
+      // Security: iframes are NOT allowed (removed from ADD_TAGS to prevent XSS)
       ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.-]+(?:[^a-z+.:-]|$))/i,
     });
 

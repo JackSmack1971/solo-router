@@ -9,6 +9,102 @@ import { render } from '@testing-library/react';
 import { Markdown } from '../Markdown';
 
 describe('Markdown Component', () => {
+  /**
+   * AT-016: Markdown XSS Prevention Tests
+   * These 5 tests MUST pass to ensure critical security controls are in place.
+   * If any of these tests fail, it indicates a security vulnerability.
+   */
+  describe('AT-016: Markdown XSS Prevention (Critical Security)', () => {
+    it('1. should strip <script> tags from rendered output', () => {
+      const maliciousContent = 'Hello <script>alert("XSS")</script> World';
+
+      const { container } = render(<Markdown content={maliciousContent} />);
+
+      // CRITICAL: Script tags must never appear in the DOM
+      const scriptTags = container.querySelectorAll('script');
+      expect(scriptTags.length).toBe(0);
+
+      // Verify safe content is still rendered
+      expect(container.textContent).toContain('Hello');
+      expect(container.textContent).toContain('World');
+
+      // Ensure script content is not executed or visible
+      expect(container.textContent).not.toContain('alert');
+    });
+
+    it('2. should strip <iframe> tags from rendered output', () => {
+      const maliciousContent = 'Test <iframe src="https://evil.com"></iframe> content';
+
+      const { container } = render(<Markdown content={maliciousContent} />);
+
+      // CRITICAL: iframes must be stripped to prevent embedding malicious content
+      const iframeTags = container.querySelectorAll('iframe');
+      expect(iframeTags.length).toBe(0);
+
+      // Verify safe content is rendered
+      expect(container.textContent).toContain('Test');
+      expect(container.textContent).toContain('content');
+    });
+
+    it('3. should strip onerror and other event handler attributes', () => {
+      const maliciousContent = `
+        <img src="invalid.jpg" onerror="alert('XSS')">
+        <div onload="alert('XSS')">Test</div>
+        <a href="#" onclick="alert('XSS')">Link</a>
+      `;
+
+      const { container } = render(<Markdown content={maliciousContent} />);
+
+      // CRITICAL: No element should have event handler attributes
+      const allElements = container.querySelectorAll('*');
+      allElements.forEach((el) => {
+        expect(el.hasAttribute('onerror')).toBe(false);
+        expect(el.hasAttribute('onload')).toBe(false);
+        expect(el.hasAttribute('onclick')).toBe(false);
+        expect(el.hasAttribute('onmouseover')).toBe(false);
+        expect(el.hasAttribute('onmouseout')).toBe(false);
+      });
+    });
+
+    it('4. should strip javascript: protocol from links', () => {
+      const maliciousContent = '[Click me](javascript:alert("XSS"))';
+
+      const { container } = render(<Markdown content={maliciousContent} />);
+
+      const link = container.querySelector('a');
+
+      // CRITICAL: javascript: URLs must be removed or neutralized
+      if (link) {
+        const href = link.getAttribute('href');
+        // Either href is null or doesn't contain javascript:
+        expect(href === null || !href.includes('javascript:')).toBe(true);
+      }
+    });
+
+    it('5. should strip dangerous data: URIs from links and images', () => {
+      const maliciousLinkContent = '[Click](data:text/html,<script>alert("XSS")</script>)';
+      const maliciousImageContent = '![alt](data:text/html,<script>alert("XSS")</script>)';
+
+      const { container: linkContainer } = render(<Markdown content={maliciousLinkContent} />);
+      const { container: imageContainer } = render(<Markdown content={maliciousImageContent} />);
+
+      // CRITICAL: Dangerous data: URIs must be stripped
+      const link = linkContainer.querySelector('a');
+      if (link) {
+        const href = link.getAttribute('href');
+        // Should not contain dangerous HTML data URL
+        expect(href === null || !href.includes('data:text/html')).toBe(true);
+      }
+
+      const img = imageContainer.querySelector('img');
+      if (img) {
+        const src = img.getAttribute('src');
+        // Should not contain script tags in data URL
+        expect(src === null || !src.includes('<script>')).toBe(true);
+      }
+    });
+  });
+
   describe('Security - XSS Prevention (FR-003)', () => {
     it('should strip <script> tags from rendered output', () => {
       const maliciousContent = 'Hello <script>alert("XSS")</script> World';
