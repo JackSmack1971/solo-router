@@ -46,7 +46,6 @@ describe('Integration - Abort and Retry Stream', () => {
       result.current.createConversation('Test');
     });
 
-    let firstStreamAborted = false;
     let secondStreamStarted = false;
 
     // Mock first stream that will be aborted
@@ -57,7 +56,6 @@ describe('Integration - Abort and Retry Stream', () => {
 
       // Check if aborted
       if (params.signal?.aborted) {
-        firstStreamAborted = true;
         return;
       }
 

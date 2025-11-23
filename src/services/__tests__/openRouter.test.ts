@@ -14,7 +14,6 @@ import type { StreamParams, TokenUsage } from '../../types';
  */
 function createMockStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
-  let chunkIndex = 0;
 
   return new ReadableStream({
     start(controller) {
@@ -26,7 +25,6 @@ function createMockStream(chunks: string[]): ReadableStream<Uint8Array> {
     },
     cancel() {
       // Handle stream cancellation
-      chunkIndex = chunks.length;
     },
   });
 }

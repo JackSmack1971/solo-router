@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useChatStore } from '../chatStore';
-import type { Conversation } from '../../types';
 
 describe('ChatStore - Conversation CRUD (AT-003)', () => {
   beforeEach(() => {
@@ -40,9 +39,8 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     it('should create a conversation with custom title', () => {
       const { result } = renderHook(() => useChatStore());
 
-      let conversationId: string = '';
       act(() => {
-        conversationId = result.current.createConversation('My Custom Title');
+        result.current.createConversation('My Custom Title');
       });
 
       expect(result.current.conversations).toHaveLength(1);
@@ -142,11 +140,10 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
       const { result } = renderHook(() => useChatStore());
 
       let conv1Id: string = '';
-      let conv2Id: string = '';
 
       act(() => {
         conv1Id = result.current.createConversation('Test 1');
-        conv2Id = result.current.createConversation('Test 2');
+        result.current.createConversation('Test 2');
       });
 
       const conversationsBefore = result.current.conversations;

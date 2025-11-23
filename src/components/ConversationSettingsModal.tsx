@@ -67,11 +67,15 @@ export const ConversationSettingsModal: React.FC<ConversationSettingsModalProps>
   // Reset state when modal opens or conversation changes
   useEffect(() => {
     if (isOpen && conversation) {
-      setSelectedModel(conversation.model);
-      setTemperature(conversation.settings.temperature);
-      setMaxTokens(conversation.settings.maxTokens);
-      setSystemPrompt(conversation.settings.systemPrompt || '');
-      setModelSearch('');
+      // Schedule state updates to avoid synchronous setState in effect
+      const timer = setTimeout(() => {
+        setSelectedModel(conversation.model);
+        setTemperature(conversation.settings.temperature);
+        setMaxTokens(conversation.settings.maxTokens);
+        setSystemPrompt(conversation.settings.systemPrompt || '');
+        setModelSearch('');
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isOpen, conversation]);
 

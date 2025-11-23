@@ -43,9 +43,8 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
       const { result } = renderHook(() => useChatStore());
 
       // Create a conversation first
-      let convId: string = '';
       act(() => {
-        convId = result.current.createConversation('Test');
+        result.current.createConversation('Test');
       });
 
       // Mock streamChat to never resolve (keeps it generating)

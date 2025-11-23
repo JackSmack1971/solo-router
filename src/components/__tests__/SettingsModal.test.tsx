@@ -64,15 +64,15 @@ describe('SettingsModal Component (AT-009)', () => {
     vi.mocked(storage.estimateStorageSize).mockReturnValue(1024);
 
     // Mock Zustand store
-    vi.mocked(useChatStore).mockImplementation((selector: any) => {
-      const state = {
+    vi.mocked(useChatStore).mockImplementation(<T,>(selector: (state: typeof mockState) => T): T => {
+      const mockState = {
         settings: defaultSettings,
         updateSettings: mockUpdateSettings,
         availableModels: mockModels,
         isLoadingModels: false,
         fetchModels: mockFetchModels,
       };
-      return selector(state);
+      return selector(mockState);
     });
   });
 

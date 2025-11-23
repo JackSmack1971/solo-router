@@ -477,8 +477,6 @@ describe('Integration - Export/Import Roundtrip (AT-021)', () => {
         await result.current.sendMessage('Test with special chars: < > & " \' `');
       });
 
-      const originalConv = result.current.conversations[0];
-
       // ================================================================
       // Perform roundtrip
       // ================================================================
@@ -588,25 +586,21 @@ And some **bold** and *italic* text.`;
     it('should merge data in merge mode', async () => {
       // Create initial data
       const { result: s1 } = renderHook(() => useChatStore());
-      let originalId1: string = '';
-      let originalId2: string = '';
 
       act(() => {
-        originalId1 = s1.current.createConversation('Original 1');
-        originalId2 = s1.current.createConversation('Original 2');
+        s1.current.createConversation('Original 1');
+        s1.current.createConversation('Original 2');
       });
 
       const originalConversations = s1.current.conversations;
 
       // Create new conversations to import (with different IDs)
       const { result: s2 } = renderHook(() => useChatStore());
-      let importId1: string = '';
-      let importId2: string = '';
 
       act(() => {
         s2.current.clearAllData();
-        importId1 = s2.current.createConversation('Import 1');
-        importId2 = s2.current.createConversation('Import 2');
+        s2.current.createConversation('Import 1');
+        s2.current.createConversation('Import 2');
       });
 
       // Create export data from the import conversations
