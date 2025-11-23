@@ -245,6 +245,9 @@ describe('Storage Utilities', () => {
         temperature: 0.5,
         maxTokens: 2048,
         systemPrompt: null,
+        topP: 1.0,
+        frequencyPenalty: 0.0,
+        presencePenalty: 0.0,
       };
 
       saveSettings(settings);
@@ -292,6 +295,9 @@ describe('Storage Utilities', () => {
         temperature: 0.7,
         maxTokens: 2048,
         systemPrompt: 'test',
+        topP: 1.0,
+        frequencyPenalty: 0.0,
+        presencePenalty: 0.0,
       };
 
       saveSettings(settings);
@@ -348,6 +354,582 @@ describe('Storage Utilities', () => {
           expect(data).not.toContain(apiKey);
         }
       }
+    });
+  });
+
+  describe('Import/Export Functionality (AT-008)', () => {
+    it('should validate export data structure', () => {
+      const conversations: Conversation[] = [
+        {
+          id: 'conv-1',
+          title: 'Test Conversation',
+          messages: [
+            {
+              id: 'msg-1',
+              role: 'user',
+              content: 'Test message',
+              timestamp: Date.now(),
+            },
+          ],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          model: 'test-model',
+          settings: {
+            temperature: 0.7,
+            maxTokens: 2048,
+            systemPrompt: null,
+          },
+          metadata: {
+            messageCount: 1,
+          },
+        },
+      ];
+
+      const settings: AppSettings = {
+        theme: 'dark',
+        defaultModel: 'test',
+        temperature: 0.8,
+        maxTokens: 4096,
+        systemPrompt: 'Test prompt',
+        topP: 1.0,
+        frequencyPenalty: 0.0,
+        presencePenalty: 0.0,
+      };
+
+      saveConversations(conversations);
+      saveSettings(settings);
+
+      // Verify by checking localStorage directly since export uses loadConversations/loadSettings
+      const exportedConvs = loadConversations();
+      const exportedSettings = loadSettings();
+
+      expect(exportedConvs).toEqual(conversations);
+      expect(exportedSettings).toEqual(settings);
+    });
+
+    it('should import valid JSON data successfully', async () => {
+      const exportData = {
+        version: '1.0',
+        exportedAt: Date.now(),
+        conversations: [
+          {
+            id: 'import-conv-1',
+            title: 'Imported Conversation',
+            messages: [
+              {
+                id: 'msg-1',
+                role: 'user' as const,
+                content: 'Imported message',
+                timestamp: Date.now(),
+              },
+            ],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            model: 'test-model',
+            settings: {
+              temperature: 0.7,
+              maxTokens: 2048,
+              systemPrompt: null,
+            },
+            metadata: {
+              messageCount: 1,
+            },
+          },
+        ],
+        settings: {
+          theme: 'light' as const,
+          defaultModel: 'imported-model',
+          temperature: 0.6,
+          maxTokens: 3000,
+          systemPrompt: 'Imported prompt',
+        },
+      };
+
+      const jsonString = JSON.stringify(exportData);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const file = new File([blob], 'backup.json', { type: 'application/json' });
+
+      const { importData } = await import('../storage');
+      const result = await importData(file, 'replace');
+
+      expect(result.conversations).toBe(1);
+      expect(result.settings).toBe(true);
+
+      const loadedConversations = loadConversations();
+      const loadedSettings = loadSettings();
+
+      expect(loadedConversations).toHaveLength(1);
+      expect(loadedConversations[0].id).toBe('import-conv-1');
+      expect(loadedSettings.theme).toBe('light');
+      expect(loadedSettings.defaultModel).toBe('imported-model');
+    });
+
+    it('should merge imported conversations with existing ones', async () => {
+      const existing: Conversation[] = [
+        {
+          id: 'existing-1',
+          title: 'Existing',
+          messages: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          model: 'test',
+          settings: {
+            temperature: 0.7,
+            maxTokens: 2048,
+            systemPrompt: null,
+          },
+          metadata: {
+            messageCount: 0,
+          },
+        },
+      ];
+
+      saveConversations(existing);
+
+      const exportData = {
+        version: '1.0',
+        exportedAt: Date.now(),
+        conversations: [
+          {
+            id: 'imported-1',
+            title: 'Imported',
+            messages: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            model: 'test',
+            settings: {
+              temperature: 0.7,
+              maxTokens: 2048,
+              systemPrompt: null,
+            },
+            metadata: {
+              messageCount: 0,
+            },
+          },
+        ],
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const jsonString = JSON.stringify(exportData);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const file = new File([blob], 'backup.json', { type: 'application/json' });
+
+      const { importData } = await import('../storage');
+      await importData(file, 'merge');
+
+      const loaded = loadConversations();
+      expect(loaded).toHaveLength(2);
+      expect(loaded.find(c => c.id === 'existing-1')).toBeDefined();
+      expect(loaded.find(c => c.id === 'imported-1')).toBeDefined();
+    });
+
+    it('should reject invalid import file format', async () => {
+      const invalidData = {
+        invalidKey: 'value',
+        // Missing required fields
+      };
+
+      const jsonString = JSON.stringify(invalidData);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const file = new File([blob], 'invalid.json', { type: 'application/json' });
+
+      const { importData } = await import('../storage');
+
+      await expect(importData(file)).rejects.toThrow('Invalid backup file format');
+    });
+
+    it('should reject empty import file', async () => {
+      const blob = new Blob([''], { type: 'application/json' });
+      const file = new File([blob], 'empty.json', { type: 'application/json' });
+
+      const { importData } = await import('../storage');
+
+      await expect(importData(file)).rejects.toThrow();
+    });
+
+    it('should reject malformed JSON in import file', async () => {
+      const blob = new Blob(['{ invalid json }'], { type: 'application/json' });
+      const file = new File([blob], 'malformed.json', { type: 'application/json' });
+
+      const { importData } = await import('../storage');
+
+      await expect(importData(file)).rejects.toThrow();
+    });
+
+    it('should filter duplicate conversations during merge import', async () => {
+      const existing: Conversation[] = [
+        {
+          id: 'duplicate-id',
+          title: 'Original',
+          messages: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          model: 'test',
+          settings: {
+            temperature: 0.7,
+            maxTokens: 2048,
+            systemPrompt: null,
+          },
+          metadata: {
+            messageCount: 0,
+          },
+        },
+      ];
+
+      saveConversations(existing);
+
+      const exportData = {
+        version: '1.0',
+        exportedAt: Date.now(),
+        conversations: [
+          {
+            id: 'duplicate-id', // Same ID
+            title: 'Duplicate',
+            messages: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            model: 'test',
+            settings: {
+              temperature: 0.7,
+              maxTokens: 2048,
+              systemPrompt: null,
+            },
+            metadata: {
+              messageCount: 0,
+            },
+          },
+        ],
+        settings: DEFAULT_SETTINGS,
+      };
+
+      const jsonString = JSON.stringify(exportData);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const file = new File([blob], 'backup.json', { type: 'application/json' });
+
+      const { importData } = await import('../storage');
+      await importData(file, 'merge');
+
+      const loaded = loadConversations();
+      // Should still have only 1 conversation (no duplicates)
+      expect(loaded).toHaveLength(1);
+      // Should keep the original
+      expect(loaded[0].title).toBe('Original');
+    });
+  });
+
+  describe('Error Handling - QuotaExceededError (AT-008)', () => {
+    it('should handle QuotaExceededError when saving conversations', () => {
+      const largeConversations: Conversation[] = Array.from({ length: 100 }, (_, i) => ({
+        id: `conv-${i}`,
+        title: `Conversation ${i}`,
+        messages: Array.from({ length: 100 }, (_, j) => ({
+          id: `msg-${i}-${j}`,
+          role: 'user' as const,
+          content: 'A'.repeat(1000), // Large content
+          timestamp: Date.now(),
+        })),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        model: 'test',
+        settings: {
+          temperature: 0.7,
+          maxTokens: 2048,
+          systemPrompt: null,
+        },
+        metadata: {
+          messageCount: 100,
+        },
+      }));
+
+      // Mock localStorage to throw QuotaExceededError
+      const originalSetItem = localStorage.setItem;
+      localStorage.setItem = vi.fn(() => {
+        const error = new Error('QuotaExceededError');
+        error.name = 'QuotaExceededError';
+        throw error;
+      });
+
+      // Should not throw - error should be handled gracefully
+      expect(() => saveConversations(largeConversations)).not.toThrow();
+
+      // Restore
+      localStorage.setItem = originalSetItem;
+    });
+
+    it('should handle QuotaExceededError when saving settings', () => {
+      const largeSettings: AppSettings = {
+        theme: 'dark',
+        defaultModel: 'test',
+        temperature: 0.7,
+        maxTokens: 2048,
+        systemPrompt: 'A'.repeat(10000), // Very large system prompt
+      };
+
+      // Mock localStorage to throw QuotaExceededError
+      const originalSetItem = localStorage.setItem;
+      localStorage.setItem = vi.fn(() => {
+        const error = new Error('QuotaExceededError');
+        error.name = 'QuotaExceededError';
+        throw error;
+      });
+
+      // Should not throw
+      expect(() => saveSettings(largeSettings)).not.toThrow();
+
+      // Restore
+      localStorage.setItem = originalSetItem;
+    });
+
+    it('should handle localStorage being disabled/unavailable', () => {
+      const originalGetItem = localStorage.getItem;
+      const originalSetItem = localStorage.setItem;
+
+      // Mock localStorage methods to throw
+      localStorage.getItem = vi.fn(() => {
+        throw new Error('localStorage is not available');
+      });
+      localStorage.setItem = vi.fn(() => {
+        throw new Error('localStorage is not available');
+      });
+
+      // All operations should handle errors gracefully
+      expect(() => saveConversations([])).not.toThrow();
+      expect(() => loadConversations()).not.toThrow();
+      expect(() => saveSettings(DEFAULT_SETTINGS)).not.toThrow();
+      expect(() => loadSettings()).not.toThrow();
+
+      // Restore
+      localStorage.getItem = originalGetItem;
+      localStorage.setItem = originalSetItem;
+    });
+  });
+
+  describe('Edge Cases (AT-008)', () => {
+    it('should handle empty localStorage gracefully', () => {
+      // Ensure storage is empty
+      localStorage.clear();
+
+      const conversations = loadConversations();
+      const settings = loadSettings();
+
+      expect(conversations).toEqual([]);
+      expect(settings).toEqual(DEFAULT_SETTINGS);
+    });
+
+    it('should handle non-string values in localStorage', () => {
+      // Directly set non-string values (simulating corruption)
+      const originalGetItem = localStorage.getItem;
+
+      // Mock to return various non-string types
+      localStorage.getItem = vi.fn((key: string) => {
+        if (key === STORAGE_KEYS.CONVERSATIONS) {
+          // Return a number instead of string
+          return 12345 as any;
+        }
+        if (key === STORAGE_KEYS.SETTINGS) {
+          // Return an object instead of string
+          return { broken: true } as any;
+        }
+        return null;
+      });
+
+      // Should handle gracefully
+      const conversations = loadConversations();
+      const settings = loadSettings();
+
+      expect(conversations).toEqual([]);
+      expect(settings).toEqual(DEFAULT_SETTINGS);
+
+      // Restore
+      localStorage.getItem = originalGetItem;
+    });
+
+    it('should handle conversations with invalid message structure', () => {
+      const invalidConversations = [
+        {
+          id: 'valid-id',
+          title: 'Valid title',
+          messages: [
+            // Missing required fields
+            { content: 'No role or timestamp' },
+          ],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ];
+
+      localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(invalidConversations));
+
+      const loaded = loadConversations();
+
+      // The validation only checks for id and messages array existence, not message content
+      // So this will actually pass validation and load the conversation
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].id).toBe('valid-id');
+    });
+
+    it('should handle settings with null values', () => {
+      const settingsWithNulls = {
+        theme: null,
+        defaultModel: null,
+        temperature: null,
+        maxTokens: null,
+        systemPrompt: null,
+      };
+
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settingsWithNulls));
+
+      const loaded = loadSettings();
+
+      // Should merge with defaults, which means null values override defaults
+      expect(loaded.systemPrompt).toBeNull();
+      expect(loaded.defaultModel).toBeNull();
+      // Temperature and maxTokens are also null because they override defaults
+      expect(loaded.temperature).toBeNull();
+      expect(loaded.maxTokens).toBeNull();
+      // Theme should be null as well
+      expect(loaded.theme).toBeNull();
+    });
+
+    it('should handle extremely large conversation arrays', () => {
+      const largeArray: Conversation[] = Array.from({ length: 1000 }, (_, i) => ({
+        id: `conv-${i}`,
+        title: `Conversation ${i}`,
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        model: 'test',
+        settings: {
+          temperature: 0.7,
+          maxTokens: 2048,
+          systemPrompt: null,
+        },
+        metadata: {
+          messageCount: 0,
+        },
+      }));
+
+      // Should handle large arrays without errors
+      expect(() => saveConversations(largeArray)).not.toThrow();
+
+      const loaded = loadConversations();
+      expect(loaded).toHaveLength(1000);
+    });
+
+    it('should handle conversations array with missing required fields', () => {
+      const incompleteConversations = [
+        {
+          id: 'conv-1',
+          // Missing title
+          messages: [],
+        },
+        {
+          // Missing id
+          title: 'No ID',
+          messages: [],
+        },
+        {
+          id: 'conv-3',
+          title: 'No messages field',
+          // Missing messages array
+        },
+      ];
+
+      localStorage.setItem(STORAGE_KEYS.CONVERSATIONS, JSON.stringify(incompleteConversations));
+
+      const loaded = loadConversations();
+
+      // Should detect invalid structure and return empty array
+      expect(loaded).toEqual([]);
+    });
+
+    it('should handle settings with extra unknown fields', () => {
+      const settingsWithExtras = {
+        ...DEFAULT_SETTINGS,
+        unknownField1: 'value1',
+        unknownField2: 123,
+        nestedObject: { a: 1, b: 2 },
+      };
+
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settingsWithExtras));
+
+      const loaded = loadSettings();
+
+      // Should load successfully, extra fields will be preserved
+      expect(loaded.theme).toBe(DEFAULT_SETTINGS.theme);
+      expect(loaded.temperature).toBe(DEFAULT_SETTINGS.temperature);
+      // Extra fields are included due to spread operator
+      expect((loaded as any).unknownField1).toBe('value1');
+    });
+
+    it('should handle concurrent saves to the same key', () => {
+      const conv1: Conversation[] = [
+        {
+          id: 'conv-1',
+          title: 'First',
+          messages: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          model: 'test',
+          settings: {
+            temperature: 0.7,
+            maxTokens: 2048,
+            systemPrompt: null,
+          },
+          metadata: {
+            messageCount: 0,
+          },
+        },
+      ];
+
+      const conv2: Conversation[] = [
+        {
+          id: 'conv-2',
+          title: 'Second',
+          messages: [],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          model: 'test',
+          settings: {
+            temperature: 0.7,
+            maxTokens: 2048,
+            systemPrompt: null,
+          },
+          metadata: {
+            messageCount: 0,
+          },
+        },
+      ];
+
+      // Simulate concurrent saves
+      saveConversations(conv1);
+      saveConversations(conv2);
+
+      const loaded = loadConversations();
+
+      // Last write wins
+      expect(loaded).toEqual(conv2);
+      expect(loaded).toHaveLength(1);
+      expect(loaded[0].id).toBe('conv-2');
+    });
+
+    it('should handle API key with special characters', () => {
+      const specialKey = 'sk-test!@#$%^&*()_+-=[]{}|;:,.<>?/~`';
+
+      saveApiKey(specialKey);
+      const retrieved = getApiKey();
+
+      expect(retrieved).toBe(specialKey);
+    });
+
+    it('should handle very long API keys', () => {
+      const longKey = 'sk-' + 'a'.repeat(1000);
+
+      saveApiKey(longKey);
+      const retrieved = getApiKey();
+
+      expect(retrieved).toBe(longKey);
+      expect(retrieved?.length).toBe(1003);
     });
   });
 });
