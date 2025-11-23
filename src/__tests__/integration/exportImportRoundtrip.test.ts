@@ -9,7 +9,8 @@ import { renderHook, act } from '@testing-library/react';
 import { useChatStore } from '../../store/chatStore';
 import * as openRouterModule from '../../services/openRouter';
 import * as storageModule from '../../utils/storage';
-import type { StreamParams, ExportData, Conversation, AppSettings } from '../../types';
+import type { StreamParams, Conversation, AppSettings } from '../../types';
+import type { ExportData } from '../../utils/storage';
 
 // Mock the openRouter module
 vi.mock('../../services/openRouter', () => ({

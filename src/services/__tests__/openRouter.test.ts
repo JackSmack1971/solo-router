@@ -875,7 +875,7 @@ describe('OpenRouter Service', () => {
         json: async () => {
           throw new Error('Invalid JSON');
         },
-      } as Response;
+      } as unknown as Response;
 
       fetchSpy.mockResolvedValueOnce(mockResponse);
 

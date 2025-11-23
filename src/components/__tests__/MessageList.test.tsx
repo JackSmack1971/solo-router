@@ -49,8 +49,8 @@ describe('MessageList Component (AT-011)', () => {
       id: 'test-model',
       name: 'Test Model',
       pricing: {
-        prompt: '0.001',
-        completion: '0.002',
+        prompt: 0.001,
+        completion: 0.002,
       },
     },
   ];

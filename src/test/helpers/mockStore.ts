@@ -3,7 +3,8 @@
  * Provides utilities for resetting and creating test store instances
  */
 
-import { create, StoreApi, UseBoundStore } from 'zustand';
+import { create } from 'zustand';
+import type { StoreApi, UseBoundStore } from 'zustand';
 import type { Conversation, Message, AppSettings, ModelSummary } from '../../types';
 import { DEFAULT_SETTINGS } from '../../utils/storage';
 

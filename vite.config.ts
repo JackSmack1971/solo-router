@@ -4,9 +4,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // @ts-expect-error - Type mismatch due to vite version conflict in node_modules
   plugins: [
     react(),
+    // Type mismatch due to vite version conflict between vitest/config (vite 7) and vite-plugin-pwa (vite 5)
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
@@ -48,7 +48,7 @@ export default defineConfig({
           }
         ]
       }
-    })
+    }) as any,
   ],
   test: {
     globals: true,

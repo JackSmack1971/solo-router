@@ -49,6 +49,11 @@ describe('ChatInterface Component (AT-009)', () => {
     messages: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    settings: {
+      temperature: 0.7,
+      maxTokens: 2000,
+      systemPrompt: null,
+    },
   };
 
   // Default mock store state

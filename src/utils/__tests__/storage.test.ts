@@ -859,7 +859,7 @@ describe('Storage Utilities', () => {
       expect(loaded.theme).toBe(DEFAULT_SETTINGS.theme);
       expect(loaded.temperature).toBe(DEFAULT_SETTINGS.temperature);
       // Extra fields are included due to spread operator
-      expect((loaded as Record<string, unknown>).unknownField1).toBe('value1');
+      expect((loaded as unknown as Record<string, unknown>).unknownField1).toBe('value1');
     });
 
     it('should handle concurrent saves to the same key', () => {
