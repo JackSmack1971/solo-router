@@ -544,4 +544,397 @@ describe('OpenRouter Service', () => {
       expect(message).toBe('Network failure');
     });
   });
+
+  describe('Model Fetching (AT-006)', () => {
+    it('should fetch and transform models successfully', async () => {
+      // Arrange: Mock successful API response
+      const mockModelsResponse = {
+        data: [
+          {
+            id: 'openai/gpt-4',
+            name: 'GPT-4',
+            description: 'OpenAI GPT-4',
+            context_length: 8192,
+            pricing: { prompt: '0.00003', completion: '0.00006' },
+          },
+          {
+            id: 'anthropic/claude-3-opus',
+            name: 'Claude 3 Opus',
+            description: 'Anthropic Claude 3 Opus',
+            context_length: 200000,
+            pricing: { prompt: '0.000015', completion: '0.000075' },
+          },
+        ],
+      };
+
+      fetchSpy.mockResolvedValueOnce(
+        createMockResponse(200, mockModelsResponse)
+      );
+
+      // Act
+      const models = await provider.listModels();
+
+      // Assert
+      expect(models).toHaveLength(2);
+      expect(models[0]).toEqual({
+        id: 'openai/gpt-4',
+        name: 'GPT-4',
+        description: 'OpenAI GPT-4',
+        contextLength: 8192,
+        pricing: { prompt: 0.00003, completion: 0.00006 },
+      });
+      expect(models[1]).toEqual({
+        id: 'anthropic/claude-3-opus',
+        name: 'Claude 3 Opus',
+        description: 'Anthropic Claude 3 Opus',
+        contextLength: 200000,
+        pricing: { prompt: 0.000015, completion: 0.000075 },
+      });
+    });
+
+    it('should return fallback models when API key is missing', async () => {
+      // Arrange: Mock empty API key
+      Object.defineProperty(window, 'sessionStorage', {
+        value: {
+          getItem: vi.fn(() => null),
+          setItem: vi.fn(),
+          removeItem: vi.fn(),
+          clear: vi.fn(),
+          length: 0,
+          key: vi.fn(),
+        },
+        writable: true,
+      });
+
+      // Act
+      const models = await provider.listModels();
+
+      // Assert: Should return fallback list without calling API
+      expect(models.length).toBeGreaterThan(0);
+      expect(models[0].id).toBeTruthy();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('should return fallback models when API returns non-OK response', async () => {
+      // Arrange: Mock 401 response
+      fetchSpy.mockResolvedValueOnce(
+        createMockResponse(401, { error: { message: 'Unauthorized' } }, 'Unauthorized')
+      );
+
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Act
+      const models = await provider.listModels();
+
+      // Assert
+      expect(models.length).toBeGreaterThan(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to fetch models')
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should return fallback models when API returns invalid format', async () => {
+      // Arrange: Mock response with invalid format
+      fetchSpy.mockResolvedValueOnce(
+        createMockResponse(200, { invalid: 'format' })
+      );
+
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Act
+      const models = await provider.listModels();
+
+      // Assert
+      expect(models.length).toBeGreaterThan(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Invalid models response format')
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should return fallback models when fetch throws error', async () => {
+      // Arrange: Mock network error
+      fetchSpy.mockRejectedValueOnce(new Error('Network error'));
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Act
+      const models = await provider.listModels();
+
+      // Assert
+      expect(models.length).toBeGreaterThan(0);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Error fetching models'),
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle models without pricing information', async () => {
+      // Arrange: Mock models without pricing
+      const mockModelsResponse = {
+        data: [
+          {
+            id: 'test/model',
+            name: 'Test Model',
+            description: 'A test model',
+            context_length: 4096,
+          },
+        ],
+      };
+
+      fetchSpy.mockResolvedValueOnce(
+        createMockResponse(200, mockModelsResponse)
+      );
+
+      // Act
+      const models = await provider.listModels();
+
+      // Assert
+      expect(models).toHaveLength(1);
+      expect(models[0].pricing).toBeUndefined();
+    });
+
+    it('should use model id as name when name is missing', async () => {
+      // Arrange: Mock model without name field
+      const mockModelsResponse = {
+        data: [
+          {
+            id: 'test/model-id',
+            context_length: 4096,
+          },
+        ],
+      };
+
+      fetchSpy.mockResolvedValueOnce(
+        createMockResponse(200, mockModelsResponse)
+      );
+
+      // Act
+      const models = await provider.listModels();
+
+      // Assert
+      expect(models).toHaveLength(1);
+      expect(models[0].name).toBe('test/model-id');
+    });
+  });
+
+  describe('Abort Handling - Network Verification (AT-006)', () => {
+    it('should pass abort signal to fetch request', async () => {
+      // Arrange
+      const abortController = new AbortController();
+
+      const sseChunks = [
+        'data: {"id":"1","choices":[{"delta":{"content":"Test"},"index":0}],"created":1234567890,"model":"test-model"}\n\n',
+        'data: [DONE]\n\n',
+      ];
+
+      const mockStream = createMockStream(sseChunks);
+      fetchSpy.mockResolvedValueOnce(createMockResponse(200, mockStream));
+
+      const params: StreamParams = {
+        messages: [{ role: 'user', content: 'test' }],
+        model: 'test-model',
+        settings: { temperature: 0.7, maxTokens: 100 },
+        onChunk: vi.fn(),
+        onDone: vi.fn(),
+        onError: vi.fn(),
+        signal: abortController.signal,
+      };
+
+      // Act
+      await provider.streamChat(params);
+
+      // Assert: Verify fetch was called with the abort signal
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const fetchCall = fetchSpy.mock.calls[0];
+      expect(fetchCall[1]).toBeDefined();
+      expect(fetchCall[1].signal).toBe(abortController.signal);
+    });
+
+    it('should handle abort during stream reading', async () => {
+      // Arrange: Create a stream that will be aborted mid-read
+      const abortError = new Error('The operation was aborted.');
+      abortError.name = 'AbortError';
+
+      // Create a stream that throws AbortError when trying to read
+      const mockStream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode(
+            'data: {"id":"1","choices":[{"delta":{"content":"Start"},"index":0}]}\n\n'
+          ));
+        },
+        async pull() {
+          // Simulate abort during pull
+          throw abortError;
+        },
+      });
+
+      fetchSpy.mockResolvedValueOnce(createMockResponse(200, mockStream));
+
+      const onChunk = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+
+      const abortController = new AbortController();
+
+      const params: StreamParams = {
+        messages: [{ role: 'user', content: 'test' }],
+        model: 'test-model',
+        settings: { temperature: 0.7, maxTokens: 100 },
+        onChunk,
+        onDone,
+        onError,
+        signal: abortController.signal,
+      };
+
+      // Act
+      await provider.streamChat(params);
+
+      // Assert: AbortError should not trigger onError
+      expect(onError).not.toHaveBeenCalled();
+    });
+
+    it('should properly handle aborting before fetch completes', async () => {
+      // Arrange: Abort controller that's already aborted
+      const abortController = new AbortController();
+      abortController.abort();
+
+      const abortError = new Error('The operation was aborted.');
+      abortError.name = 'AbortError';
+      fetchSpy.mockRejectedValueOnce(abortError);
+
+      const onChunk = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+
+      const params: StreamParams = {
+        messages: [{ role: 'user', content: 'test' }],
+        model: 'test-model',
+        settings: { temperature: 0.7, maxTokens: 100 },
+        onChunk,
+        onDone,
+        onError,
+        signal: abortController.signal,
+      };
+
+      // Act
+      await provider.streamChat(params);
+
+      // Assert: Should handle gracefully without calling onError
+      expect(onError).not.toHaveBeenCalled();
+      expect(onDone).not.toHaveBeenCalled();
+      expect(onChunk).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Additional Error Scenarios (AT-006)', () => {
+    it('should handle response body being null', async () => {
+      // Arrange: Mock response with null body
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        body: null,
+        json: async () => ({}),
+      } as Response;
+
+      fetchSpy.mockResolvedValueOnce(mockResponse);
+
+      const onChunk = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+
+      const params: StreamParams = {
+        messages: [{ role: 'user', content: 'test' }],
+        model: 'test-model',
+        settings: { temperature: 0.7, maxTokens: 100 },
+        onChunk,
+        onDone,
+        onError,
+      };
+
+      // Act
+      await provider.streamChat(params);
+
+      // Assert
+      expect(onError).toHaveBeenCalledTimes(1);
+      const error = onError.mock.calls[0][0];
+      expect(error.message).toContain('Response body is null');
+    });
+
+    it('should handle unparseable error response body', async () => {
+      // Arrange: Mock 500 error with unparseable body
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        body: null,
+        json: async () => {
+          throw new Error('Invalid JSON');
+        },
+      } as Response;
+
+      fetchSpy.mockResolvedValueOnce(mockResponse);
+
+      const onChunk = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+
+      const params: StreamParams = {
+        messages: [{ role: 'user', content: 'test' }],
+        model: 'test-model',
+        settings: { temperature: 0.7, maxTokens: 100 },
+        onChunk,
+        onDone,
+        onError,
+      };
+
+      // Act
+      await provider.streamChat(params);
+
+      // Assert
+      expect(onError).toHaveBeenCalledTimes(1);
+      const error = onError.mock.calls[0][0];
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).status).toBe(500);
+      expect(error.message).toBe('Internal Server Error');
+    });
+
+    it('should handle finish_reason without [DONE] marker', async () => {
+      // Arrange: Stream that ends with finish_reason instead of [DONE]
+      const sseChunks = [
+        'data: {"id":"1","choices":[{"delta":{"content":"Complete"},"index":0}],"created":1234567890,"model":"test-model"}\n\n',
+        'data: {"id":"1","choices":[{"delta":{},"finish_reason":"stop","index":0}],"created":1234567890,"model":"test-model"}\n\n',
+      ];
+
+      const mockStream = createMockStream(sseChunks);
+      fetchSpy.mockResolvedValueOnce(createMockResponse(200, mockStream));
+
+      const onChunk = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+
+      const params: StreamParams = {
+        messages: [{ role: 'user', content: 'test' }],
+        model: 'test-model',
+        settings: { temperature: 0.7, maxTokens: 100 },
+        onChunk,
+        onDone,
+        onError,
+      };
+
+      // Act
+      await provider.streamChat(params);
+
+      // Assert
+      expect(onChunk).toHaveBeenCalledWith('Complete');
+      expect(onDone).toHaveBeenCalledTimes(1);
+      expect(onError).not.toHaveBeenCalled();
+    });
+  });
 });
