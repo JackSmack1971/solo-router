@@ -14,7 +14,13 @@ import {
   DEFAULT_SETTINGS,
 } from '../utils/storage';
 import { defaultProvider } from '../services/openRouter';
-import { estimateConversationTokens, isNearContextLimit, prepareMessagesForApi } from '../utils/tokenUtils';
+import {
+  estimateConversationTokens,
+  isNearContextLimit,
+  prepareMessagesForApi,
+  pruneMessagesToFitContext,
+} from '../utils/tokenUtils';
+import { useStreamStore } from './streamStore';
 
 /**
  * Chat store state interface
@@ -175,6 +181,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
     runContextCheck?: boolean;
   }): Promise<void> => {
     const abortController = new AbortController();
+    const streamActions = useStreamStore.getState();
 
     set({
       isGenerating: true,
@@ -182,15 +189,15 @@ export const useChatStore = create<ChatStore>()((set, get) => {
     });
 
     try {
+      const { availableModels } = get();
+      const currentModel = availableModels.find((m) => m.id === model);
+      const contextLength = currentModel?.contextLength;
+
       if (runContextCheck) {
         const estimatedTokens = estimateConversationTokens(
           messagesWithoutPlaceholder.map((m) => ({ role: m.role, content: m.content })),
           settings.systemPrompt
         );
-
-        const { availableModels } = get();
-        const currentModel = availableModels.find((m) => m.id === model);
-        const contextLength = currentModel?.contextLength;
 
         if (contextLength && isNearContextLimit(estimatedTokens, contextLength)) {
           const warningMessage = `Warning: You're approaching the context limit (${estimatedTokens.toLocaleString()} / ${contextLength.toLocaleString()} tokens). Consider starting a new conversation or the model may truncate your history.`;
@@ -208,9 +215,12 @@ export const useChatStore = create<ChatStore>()((set, get) => {
         messagesWithoutPlaceholder,
         settings.systemPrompt
       );
+      const prunedMessagesForApi = pruneMessagesToFitContext(messagesForApi, contextLength);
+
+      streamActions.startStream(assistantMessageId);
 
       await defaultProvider.streamChat({
-        messages: messagesForApi,
+        messages: prunedMessagesForApi,
         model,
         settings: {
           temperature: settings.temperature,
@@ -220,50 +230,45 @@ export const useChatStore = create<ChatStore>()((set, get) => {
           presencePenalty: settings.presencePenalty,
         },
         onChunk: (text: string) => {
-          set((state) => ({
-            conversations: state.conversations.map((conv) =>
-              conv.id === conversationId
-                ? {
-                    ...conv,
-                    messages: conv.messages.map((msg) =>
-                      msg.id === assistantMessageId
-                        ? { ...msg, content: msg.content + text }
-                        : msg
-                    ),
-                  }
-                : conv
-            ),
-          }));
+          streamActions.appendToken(text);
         },
         onDone: (usage?: TokenUsage) => {
-          if (usage) {
-            set((state) => ({
-              conversations: state.conversations.map((conv) => {
-                if (conv.id !== conversationId) {
-                  return conv;
-                }
+          const { currentStream } = useStreamStore.getState();
 
-                return {
-                  ...conv,
-                  messages: conv.messages.map((msg) =>
-                    msg.id === assistantMessageId
-                      ? { ...msg, tokenCount: usage.totalTokens }
-                      : msg
-                  ),
-                  metadata: {
+          set((state) => ({
+            conversations: state.conversations.map((conv) => {
+              if (conv.id !== conversationId) {
+                return conv;
+              }
+
+              const updatedMessages = conv.messages.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, content: currentStream, tokenCount: usage?.totalTokens ?? msg.tokenCount }
+                  : msg
+              );
+
+              const updatedMetadata = usage
+                ? {
                     messageCount: conv.metadata?.messageCount || conv.messages.length,
                     totalTokens:
                       (conv.metadata?.totalTokens || 0) + (usage.totalTokens || 0),
-                  },
-                };
-              }),
-            }));
-          }
+                  }
+                : conv.metadata;
+
+              return {
+                ...conv,
+                messages: updatedMessages,
+                metadata: updatedMetadata,
+              };
+            }),
+          }));
 
           set({
             isGenerating: false,
             currentAbortController: null,
           });
+
+          streamActions.endStream();
 
           get().saveToStorage();
         },
@@ -285,6 +290,8 @@ export const useChatStore = create<ChatStore>()((set, get) => {
 
           get().setError(errorMessage);
 
+          const { currentStream } = useStreamStore.getState();
+
           set((state) => ({
             conversations: state.conversations.map((conv) =>
               conv.id === conversationId
@@ -295,7 +302,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
                         ? {
                             ...msg,
                             error: true,
-                            content: msg.content || `Error: ${errorMessage}`,
+                            content: currentStream || msg.content || `Error: ${errorMessage}`,
                           }
                         : msg
                     ),
@@ -305,6 +312,8 @@ export const useChatStore = create<ChatStore>()((set, get) => {
             isGenerating: false,
             currentAbortController: null,
           }));
+
+          streamActions.endStream();
 
           get().saveToStorage();
         },
@@ -316,6 +325,8 @@ export const useChatStore = create<ChatStore>()((set, get) => {
         isGenerating: false,
         currentAbortController: null,
       });
+
+      streamActions.endStream();
     }
   };
 
@@ -675,17 +686,44 @@ export const useChatStore = create<ChatStore>()((set, get) => {
 
   stopGeneration: () => {
     const { currentAbortController } = get();
+    const streamState = useStreamStore.getState();
 
     if (currentAbortController) {
       currentAbortController.abort();
+    }
+
+    const { activeMessageId, currentStream, endStream } = streamState;
+
+    if (activeMessageId) {
+      set((state) => ({
+        conversations: state.conversations.map((conv) => {
+          const hasMessage = conv.messages.some((msg) => msg.id === activeMessageId);
+
+          if (!hasMessage) {
+            return conv;
+          }
+
+          return {
+            ...conv,
+            messages: conv.messages.map((msg) =>
+              msg.id === activeMessageId ? { ...msg, content: currentStream || msg.content } : msg
+            ),
+          };
+        }),
+        isGenerating: false,
+        currentAbortController: null,
+      }));
+    } else {
       set({
         isGenerating: false,
         currentAbortController: null,
       });
-
-      // Save the partial response
-      get().saveToStorage();
     }
+
+    endStream();
+
+    // Save the partial response
+    get().saveToStorage();
   },
 
   // ========================================================================
