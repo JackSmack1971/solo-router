@@ -4,11 +4,12 @@
  * Based on SPEC.md FR-001, FR-002, FR-003
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useOptimistic, useRef, useState, useTransition } from 'react';
 import { Send, StopCircle, AlertCircle, X, Settings, SlidersHorizontal, CheckCircle2 } from 'lucide-react';
 import { useChatStore } from '../store/chatStore';
 import { MessageList } from './MessageList';
 import { ConversationSettingsModal } from './ConversationSettingsModal';
+import type { Message } from '../types';
 
 /**
  * Main chat interface component props
@@ -37,6 +38,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   const clearError = useChatStore((state) => state.clearError);
   const availableModels = useChatStore((state) => state.availableModels);
   const lastSaved = useChatStore((state) => state.lastSaved);
+  const [optimisticMessages, addOptimisticMessage] = useOptimistic(
+    activeConversation?.messages ?? [],
+    (state: Message[], message: Message) => [...state, message]
+  );
+  const [isPending, startTransition] = useTransition();
 
   /**
    * Focus input on mount and after sending messages
@@ -74,7 +80,17 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
     }
 
     const message = input.trim();
+    const tempMessage: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: message,
+      timestamp: Date.now(),
+    };
     setInput('');
+
+    startTransition(() => {
+      addOptimisticMessage(tempMessage);
+    });
 
     // Send message through store
     await sendMessage(message);
@@ -192,8 +208,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
     );
   }
 
-  const messages = activeConversation.messages;
-
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-900">
       {/* Header */}
@@ -259,7 +273,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
 
       {/* Messages - Now using virtualized MessageList component */}
       <MessageList
-        messages={messages}
+        messages={optimisticMessages}
         availableModels={availableModels}
         isGenerating={isGenerating}
         onRegenerate={handleRegenerate}
@@ -298,6 +312,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
               disabled={!input.trim()}
               className="px-3 md:px-4 py-2 md:py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-1 md:gap-2 font-medium text-sm md:text-base flex-shrink-0"
               aria-label="Send message"
+              aria-busy={isPending}
             >
               <Send size={18} className="md:w-5 md:h-5" />
               <span className="hidden sm:inline">Send</span>
