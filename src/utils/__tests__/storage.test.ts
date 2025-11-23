@@ -723,12 +723,12 @@ describe('Storage Utilities', () => {
       // Mock to return various non-string types
       localStorage.getItem = vi.fn((key: string) => {
         if (key === STORAGE_KEYS.CONVERSATIONS) {
-          // Return a number instead of string
-          return 12345 as any;
+          // Return a number instead of string (simulating corruption)
+          return 12345 as unknown as string;
         }
         if (key === STORAGE_KEYS.SETTINGS) {
-          // Return an object instead of string
-          return { broken: true } as any;
+          // Return an object instead of string (simulating corruption)
+          return { broken: true } as unknown as string;
         }
         return null;
       });
@@ -859,7 +859,7 @@ describe('Storage Utilities', () => {
       expect(loaded.theme).toBe(DEFAULT_SETTINGS.theme);
       expect(loaded.temperature).toBe(DEFAULT_SETTINGS.temperature);
       // Extra fields are included due to spread operator
-      expect((loaded as any).unknownField1).toBe('value1');
+      expect((loaded as unknown as Record<string, unknown>).unknownField1).toBe('value1');
     });
 
     it('should handle concurrent saves to the same key', () => {

@@ -1,5 +1,7 @@
 # SoloRouter Chat
 
+![CI](https://github.com/JackSmack1971/solo-router/workflows/CI/badge.svg)
+
 A **local-first**, **privacy-focused** chat interface for Large Language Models (LLMs). SoloRouter runs entirely in the browser as a Single Page Application (SPA) with no backend server, connecting directly to [OpenRouter](https://openrouter.ai/) or compatible endpoints.
 
 -----
@@ -162,9 +164,47 @@ The project uses `pnpm` for script management. Defined scripts in `package.json`
 | `build` | Compiles TypeScript and builds the app for production. |
 | `preview` | Previews the production build locally. |
 | `lint` | Runs ESLint for code quality checks. |
-| `test` | Runs unit tests using Vitest. |
+| `test` | Runs unit tests using Vitest in watch mode. |
 | `test:run` | Runs tests once (CI mode). |
+| `test:coverage` | Runs tests with coverage reporting. |
 | `type-check` | Runs TypeScript type checking without emitting files. |
+
+### Running Tests
+
+The project uses Vitest for testing. To run tests:
+
+1.  **Run tests in watch mode** (automatically re-runs on file changes):
+    ```bash
+    pnpm test
+    ```
+
+2.  **Run tests once** (useful for CI or quick checks):
+    ```bash
+    pnpm test:run
+    ```
+
+3.  **Run tests with coverage**:
+    ```bash
+    pnpm test:coverage
+    ```
+
+    Coverage reports are generated in the `coverage/` directory. The project maintains a minimum coverage threshold of **60%**.
+
+4.  **Run all quality checks** (lint, type-check, and tests):
+    ```bash
+    pnpm lint && pnpm type-check && pnpm test:coverage
+    ```
+
+### Continuous Integration
+
+The project uses GitHub Actions for CI. On every push and pull request, the following checks run:
+
+- ESLint code quality checks
+- TypeScript type checking
+- Unit tests with coverage
+- Coverage threshold validation (must be ≥60%)
+
+The build status is displayed at the top of this README.
 
 -----
 

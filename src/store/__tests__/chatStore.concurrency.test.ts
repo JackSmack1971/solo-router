@@ -121,13 +121,10 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
 
     const streamChatMock = vi.mocked(openRouterModule.defaultProvider.streamChat);
 
-    let firstStreamAborted = false;
-
     // Mock first stream
     streamChatMock.mockImplementationOnce(async (params: StreamParams) => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       if (params.signal?.aborted) {
-        firstStreamAborted = true;
         return;
       }
       params.onChunk('First response');

@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
+// @ts-ignore - Type mismatch due to vite version conflict between vitest/config (vite 7) and vite-plugin-pwa (vite 5)
 export default defineConfig({
-  // @ts-expect-error - Type mismatch due to vite version conflict in node_modules
   plugins: [
     react(),
     VitePWA({
@@ -48,7 +48,7 @@ export default defineConfig({
           }
         ]
       }
-    })
+    }),
   ],
   test: {
     globals: true,

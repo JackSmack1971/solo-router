@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChatInterface } from '../ChatInterface';
 import type { Conversation, Message } from '../../types';
@@ -49,6 +49,11 @@ describe('ChatInterface Component (AT-009)', () => {
     messages: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
+    settings: {
+      temperature: 0.7,
+      maxTokens: 2000,
+      systemPrompt: null,
+    },
   };
 
   // Default mock store state

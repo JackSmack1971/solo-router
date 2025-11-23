@@ -50,12 +50,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
    */
   useEffect(() => {
     if (lastSaved !== null) {
-      setShowSavedIndicator(true);
+      // Schedule state update to avoid synchronous setState in effect
+      const showTimer = setTimeout(() => {
+        setShowSavedIndicator(true);
+      }, 0);
       // Hide after 3 seconds
-      const timer = setTimeout(() => {
+      const hideTimer = setTimeout(() => {
         setShowSavedIndicator(false);
       }, 3000);
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+      };
     }
   }, [lastSaved]);
 

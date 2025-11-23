@@ -240,8 +240,6 @@ describe('Markdown Component', () => {
 
       const { container } = render(<Markdown content={maliciousContent} />);
 
-      const div = container.querySelector('div.prose'); // The wrapper div
-
       // Check all elements don't have event handlers
       const allElements = container.querySelectorAll('*');
       allElements.forEach((el) => {

@@ -9,7 +9,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useChatStore } from '../../store/chatStore';
 import * as openRouterModule from '../../services/openRouter';
 import * as storageModule from '../../utils/storage';
-import type { StreamParams, Conversation, AppSettings } from '../../types';
+import type { StreamParams, AppSettings } from '../../types';
 
 // Mock the openRouter module
 vi.mock('../../services/openRouter', () => ({
@@ -574,12 +574,11 @@ describe('Integration - Storage Persistence (AT-019)', () => {
     it('should restore active conversation ID on reload', async () => {
       const { result: s1 } = renderHook(() => useChatStore());
 
-      let conv1Id: string = '';
       let conv2Id: string = '';
       let conv3Id: string = '';
 
       act(() => {
-        conv1Id = s1.current.createConversation('Conv 1');
+        s1.current.createConversation('Conv 1');
         conv2Id = s1.current.createConversation('Conv 2');
         conv3Id = s1.current.createConversation('Conv 3');
       });

@@ -7,7 +7,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useChatStore } from '../chatStore';
-import type { Message } from '../../types';
 
 describe('ChatStore - Message CRUD (AT-004)', () => {
   beforeEach(() => {

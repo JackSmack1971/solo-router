@@ -20,4 +20,12 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    files: ['vite.config.ts'],
+    rules: {
+      '@typescript-eslint/ban-ts-comment': ['error', {
+        'ts-ignore': 'allow-with-description',
+      }],
+    },
+  },
 ])

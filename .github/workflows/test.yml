@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: ['**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run linter
+        run: pnpm lint
+
+      - name: Run type checking
+        run: pnpm type-check
+
+      - name: Run tests with coverage
+        run: pnpm test:coverage
+
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=$(node -e "
+            const fs = require('fs');
+            const coverage = JSON.parse(fs.readFileSync('./coverage/coverage-summary.json', 'utf8'));
+            const total = coverage.total;
+            const avgCoverage = (
+              total.lines.pct +
+              total.statements.pct +
+              total.functions.pct +
+              total.branches.pct
+            ) / 4;
+            console.log(avgCoverage.toFixed(2));
+          ")
+
+          echo "Average coverage: $COVERAGE%"
+
+          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
+            echo "❌ Coverage ($COVERAGE%) is below the required 60% threshold"
+            exit 1
+          else
+            echo "✅ Coverage ($COVERAGE%) meets the required 60% threshold"
+          fi
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          files: ./coverage/coverage-final.json
+          flags: unittests
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

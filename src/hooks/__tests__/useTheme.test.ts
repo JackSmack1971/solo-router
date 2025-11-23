@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { useTheme } from '../useTheme';
 import { useChatStore } from '../../store/chatStore';
 
@@ -16,7 +16,7 @@ vi.mock('../../store/chatStore', () => ({
 
 describe('useTheme Hook (AT-009)', () => {
   const mockUpdateSettings = vi.fn();
-  let matchMediaMock: { matches: boolean; addEventListener: any; removeEventListener: any };
+  let matchMediaMock: { matches: boolean; addEventListener: (event: string, handler: () => void) => void; removeEventListener: (event: string, handler: () => void) => void };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,17 +29,18 @@ describe('useTheme Hook (AT-009)', () => {
       removeEventListener: vi.fn(),
     };
 
-    window.matchMedia = vi.fn().mockImplementation((query: string) => matchMediaMock);
+    window.matchMedia = vi.fn().mockImplementation(() => matchMediaMock);
   });
 
   describe('Theme Application (AT-009)', () => {
     it('should apply light theme when theme is set to light', () => {
-      vi.mocked(useChatStore).mockImplementation((selector: any) => {
-        const state = {
-          settings: { theme: 'light' },
-          updateSettings: mockUpdateSettings,
-        };
-        return selector(state);
+      const mockState = {
+        settings: { theme: 'light' as const },
+        updateSettings: mockUpdateSettings,
+      };
+      // @ts-expect-error - Mocking with partial state for testing
+      vi.mocked(useChatStore).mockImplementation((selector: (state: unknown) => unknown) => {
+        return selector(mockState);
       });
 
       renderHook(() => useTheme());
@@ -49,12 +50,13 @@ describe('useTheme Hook (AT-009)', () => {
     });
 
     it('should apply dark theme when theme is set to dark', () => {
-      vi.mocked(useChatStore).mockImplementation((selector: any) => {
-        const state = {
-          settings: { theme: 'dark' },
-          updateSettings: mockUpdateSettings,
-        };
-        return selector(state);
+      const mockState = {
+        settings: { theme: 'dark' as const },
+        updateSettings: mockUpdateSettings,
+      };
+      // @ts-expect-error - Mocking with partial state for testing
+      vi.mocked(useChatStore).mockImplementation((selector: (state: unknown) => unknown) => {
+        return selector(mockState);
       });
 
       renderHook(() => useTheme());
@@ -66,12 +68,13 @@ describe('useTheme Hook (AT-009)', () => {
     it('should apply system theme (dark) when theme is set to system and system prefers dark', () => {
       matchMediaMock.matches = true; // System prefers dark
 
-      vi.mocked(useChatStore).mockImplementation((selector: any) => {
-        const state = {
-          settings: { theme: 'system' },
-          updateSettings: mockUpdateSettings,
-        };
-        return selector(state);
+      const mockState = {
+        settings: { theme: 'system' as const },
+        updateSettings: mockUpdateSettings,
+      };
+      // @ts-expect-error - Mocking with partial state for testing
+      vi.mocked(useChatStore).mockImplementation((selector: (state: unknown) => unknown) => {
+        return selector(mockState);
       });
 
       renderHook(() => useTheme());
@@ -83,12 +86,13 @@ describe('useTheme Hook (AT-009)', () => {
     it('should apply system theme (light) when theme is set to system and system prefers light', () => {
       matchMediaMock.matches = false; // System prefers light
 
-      vi.mocked(useChatStore).mockImplementation((selector: any) => {
-        const state = {
-          settings: { theme: 'system' },
-          updateSettings: mockUpdateSettings,
-        };
-        return selector(state);
+      const mockState = {
+        settings: { theme: 'system' as const },
+        updateSettings: mockUpdateSettings,
+      };
+      // @ts-expect-error - Mocking with partial state for testing
+      vi.mocked(useChatStore).mockImplementation((selector: (state: unknown) => unknown) => {
+        return selector(mockState);
       });
 
       renderHook(() => useTheme());
@@ -100,12 +104,13 @@ describe('useTheme Hook (AT-009)', () => {
 
   describe('Theme Toggle (AT-009)', () => {
     it('should toggle from light to dark', () => {
-      vi.mocked(useChatStore).mockImplementation((selector: any) => {
-        const state = {
-          settings: { theme: 'light' },
-          updateSettings: mockUpdateSettings,
-        };
-        return selector(state);
+      const mockState = {
+        settings: { theme: 'light' as const },
+        updateSettings: mockUpdateSettings,
+      };
+      // @ts-expect-error - Mocking with partial state for testing
+      vi.mocked(useChatStore).mockImplementation((selector: (state: unknown) => unknown) => {
+        return selector(mockState);
       });
 
       renderHook(() => useTheme());
@@ -129,12 +134,13 @@ describe('useTheme Hook (AT-009)', () => {
     });
 
     it('should toggle from dark to light', () => {
-      vi.mocked(useChatStore).mockImplementation((selector: any) => {
-        const state = {
-          settings: { theme: 'dark' },
-          updateSettings: mockUpdateSettings,
-        };
-        return selector(state);
+      const mockState = {
+        settings: { theme: 'dark' as const },
+        updateSettings: mockUpdateSettings,
+      };
+      // @ts-expect-error - Mocking with partial state for testing
+      vi.mocked(useChatStore).mockImplementation((selector: (state: unknown) => unknown) => {
+        return selector(mockState);
       });
 
       renderHook(() => useTheme());
@@ -157,12 +163,13 @@ describe('useTheme Hook (AT-009)', () => {
     });
 
     it('should return correct effective theme', () => {
-      vi.mocked(useChatStore).mockImplementation((selector: any) => {
-        const state = {
-          settings: { theme: 'dark' },
-          updateSettings: mockUpdateSettings,
-        };
-        return selector(state);
+      const mockState = {
+        settings: { theme: 'dark' as const },
+        updateSettings: mockUpdateSettings,
+      };
+      // @ts-expect-error - Mocking with partial state for testing
+      vi.mocked(useChatStore).mockImplementation((selector: (state: unknown) => unknown) => {
+        return selector(mockState);
       });
 
       renderHook(() => useTheme());
