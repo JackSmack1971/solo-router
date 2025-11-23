@@ -791,5 +791,6 @@ export const useChatStore = create<ChatStore>()((set, get) => {
     // Clear storage
     saveConversations([]);
     saveSettings(DEFAULT_SETTINGS);
-  }
+  },
+};
 });
