@@ -900,6 +900,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
       isGenerating: false,
       currentAbortController: null,
       error: null,
+      lastSaved: null,
     });
 
     // Clear storage

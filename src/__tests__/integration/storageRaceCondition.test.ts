@@ -446,7 +446,10 @@ describe('Integration - Storage Race Conditions', () => {
 
     saved.forEach((conv, index) => {
       expect(conv.messages).toHaveLength(50);
-      expect(conv.title).toContain(`Conv ${index}`);
+      // Conversations are prepended, so the order is reversed (LIFO)
+      // saved[0] is the last created (Conv 4), saved[4] is the first created (Conv 0)
+      const originalIndex = 4 - index;
+      expect(conv.title).toContain(`Conv ${originalIndex}`);
     });
 
     const totalDuration = saveEndTime - startTime;
