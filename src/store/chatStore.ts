@@ -792,4 +792,4 @@ export const useChatStore = create<ChatStore>()((set, get) => {
     saveConversations([]);
     saveSettings(DEFAULT_SETTINGS);
   }
-};
+});
