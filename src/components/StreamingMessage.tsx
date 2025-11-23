@@ -90,19 +90,13 @@ export const StreamingMessage: React.FC<StreamingMessageProps> = ({
       }, MARKDOWN_THROTTLE_MS);
     };
 
-    const unsubscribe = useStreamStore.subscribe(
-      (state) => ({
-        activeMessageId: state.activeMessageId,
-        currentStream: state.currentStream,
-      }),
-      (state) => {
-        if (state.activeMessageId !== messageId) {
-          return;
-        }
-
-        renderMarkdown(state.currentStream);
+    const unsubscribe = useStreamStore.subscribe((state) => {
+      if (state.activeMessageId !== messageId) {
+        return;
       }
-    );
+
+      renderMarkdown(state.currentStream);
+    });
 
     // Render any existing stream value immediately on mount
     const snapshot = useStreamStore.getState();
