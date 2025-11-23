@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest",
+    "test": "vitest run --coverage",
     "test:run": "vitest --run",
     "test:coverage": "vitest run --coverage",
     "type-check": "tsc -b --noEmit"
