@@ -34,14 +34,14 @@ vi.mock('../../services/openRouter', () => ({
 }));
 
 describe('ChatStore integration with streamStore', () => {
-  let hook: RenderHookResult<ReturnType<typeof useChatStore>, undefined>;
+  let hook: RenderHookResult<undefined, ReturnType<typeof useChatStore>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
 
-    hook = renderHook<ReturnType<typeof useChatStore>>(() => useChatStore());
+    hook = renderHook<undefined, ReturnType<typeof useChatStore>>(() => useChatStore());
     act(() => {
       hook.result.current.clearAllData();
     });
