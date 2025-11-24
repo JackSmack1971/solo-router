@@ -9,7 +9,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MessageList } from '../MessageList';
 import type { Message, ModelSummary } from '../../types';
-import { useStreamStore } from '../../store/streamStore';
+import { streamStore } from '../../store/streamStore';
 
 // Mock the Markdown component to simplify testing
 vi.mock('../Markdown', () => ({
@@ -62,7 +62,7 @@ describe('MessageList Component (AT-011)', () => {
     Element.prototype.scrollIntoView = vi.fn();
     HTMLElement.prototype.scrollTo = vi.fn();
 
-    useStreamStore.setState({
+    streamStore.setState({
       currentStream: '',
       isStreaming: false,
       activeMessageId: null,
@@ -290,7 +290,7 @@ describe('MessageList Component (AT-011)', () => {
         },
       ];
 
-      useStreamStore.setState({
+      streamStore.setState({
         currentStream: 'Streaming text',
         isStreaming: true,
         activeMessageId: 'msg-2',

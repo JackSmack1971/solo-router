@@ -20,7 +20,7 @@ import {
   prepareMessagesForApi,
   pruneMessagesToFitContext,
 } from '../utils/tokenUtils';
-import { useStreamStore } from './streamStore';
+import { streamStore } from './streamStore';
 
 /**
  * Chat store state interface
@@ -181,7 +181,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
     runContextCheck?: boolean;
   }): Promise<void> => {
     const abortController = new AbortController();
-    const streamActions = useStreamStore.getState();
+    const { streamActions } = streamStore.getState();
 
     set({
       isGenerating: true,
@@ -233,7 +233,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
           streamActions.appendToken(text);
         },
         onDone: (usage?: TokenUsage) => {
-          const { currentStream } = useStreamStore.getState();
+          const { currentStream } = streamStore.getState();
 
           set((state) => ({
             conversations: state.conversations.map((conv) => {
@@ -290,7 +290,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
 
           get().setError(errorMessage);
 
-          const { currentStream } = useStreamStore.getState();
+          const { currentStream } = streamStore.getState();
 
           set((state) => ({
             conversations: state.conversations.map((conv) =>
@@ -686,13 +686,13 @@ export const useChatStore = create<ChatStore>()((set, get) => {
 
   stopGeneration: () => {
     const { currentAbortController } = get();
-    const streamState = useStreamStore.getState();
+    const streamState = streamStore.getState();
 
     if (currentAbortController) {
       currentAbortController.abort();
     }
 
-    const { activeMessageId, currentStream, endStream } = streamState;
+    const { activeMessageId, currentStream, streamActions } = streamState;
 
     if (activeMessageId) {
       set((state) => ({
@@ -720,7 +720,7 @@ export const useChatStore = create<ChatStore>()((set, get) => {
       });
     }
 
-    endStream();
+    streamActions.endStream();
 
     // Save the partial response
     get().saveToStorage();
