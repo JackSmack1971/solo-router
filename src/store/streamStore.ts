@@ -38,10 +38,10 @@ export const streamStore = createStore<StreamState>((set) => ({
         };
       }),
     endStream: () =>
-      set({
-        currentStream: '',
+      set((state) => ({
+        ...state,
         isStreaming: false,
         activeMessageId: null,
-      }),
+      })),
   },
 }));
