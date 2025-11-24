@@ -9,6 +9,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MessageList } from '../MessageList';
 import type { Message, ModelSummary } from '../../types';
+import { useStreamStore } from '../../store/streamStore';
 
 // Mock the Markdown component to simplify testing
 vi.mock('../Markdown', () => ({
@@ -60,6 +61,12 @@ describe('MessageList Component (AT-011)', () => {
     // Mock scrollIntoView and scrollTo
     Element.prototype.scrollIntoView = vi.fn();
     HTMLElement.prototype.scrollTo = vi.fn();
+
+    useStreamStore.setState({
+      currentStream: '',
+      isStreaming: false,
+      activeMessageId: null,
+    });
   });
 
   describe('Rendering Empty State (AT-011)', () => {
@@ -264,6 +271,43 @@ describe('MessageList Component (AT-011)', () => {
           expect(scrollButton).toBeTruthy();
         });
       }
+    });
+
+    it('should render streaming message placeholder using stream store content', async () => {
+      const messages: Message[] = [
+        {
+          id: 'msg-1',
+          role: 'user',
+          content: 'Hello',
+          timestamp: Date.now(),
+        },
+        {
+          id: 'msg-2',
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          model: 'test-model',
+        },
+      ];
+
+      useStreamStore.setState({
+        currentStream: 'Streaming text',
+        isStreaming: true,
+        activeMessageId: 'msg-2',
+      });
+
+      render(
+        <MessageList
+          messages={messages}
+          availableModels={mockModels}
+          isGenerating={true}
+        />
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Streaming')).toBeTruthy();
+        expect(screen.getByText('Streaming text')).toBeTruthy();
+      });
     });
   });
 });

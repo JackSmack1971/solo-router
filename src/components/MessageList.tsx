@@ -11,6 +11,8 @@ import { Markdown } from './Markdown';
 import type { Message, ModelSummary } from '../types';
 import { calculateCost, formatCost } from '../utils/tokenUtils';
 import { useToastStore } from '../store/toastStore';
+import { useStreamStore } from '../store/streamStore';
+import { StreamingMessage } from './StreamingMessage';
 
 /**
  * Individual message bubble component
@@ -318,6 +320,9 @@ export const MessageList: React.FC<MessageListProps> = ({
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const streamingMessageId = useStreamStore((state) =>
+    state.isStreaming ? state.activeMessageId : null
+  );
 
   // Find the last assistant message index
   let lastAssistantMessageIndex = -1;
@@ -398,6 +403,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       >
         {virtualizer.getVirtualItems().map((virtualItem) => {
           const message = messages[virtualItem.index];
+          const isStreamingPlaceholder =
+            isGenerating &&
+            message.role === 'assistant' &&
+            virtualItem.index === messages.length - 1 &&
+            streamingMessageId === message.id &&
+            (!message.content || message.content.length === 0);
           return (
             <div
               key={virtualItem.key}
@@ -411,19 +422,27 @@ export const MessageList: React.FC<MessageListProps> = ({
                 transform: `translateY(${virtualItem.start}px)`,
               }}
             >
-              <MessageBubble
-                message={message}
-                availableModels={availableModels}
-                isLastAssistantMessage={
-                  message.role === 'assistant' && virtualItem.index === lastAssistantMessageIndex
-                }
-                onRegenerate={onRegenerate}
-                onEdit={
-                  message.role === 'user'
-                    ? (newContent) => onEditMessage?.(message.id, newContent)
-                    : undefined
-                }
-              />
+              {isStreamingPlaceholder ? (
+                <StreamingMessage
+                  messageId={message.id}
+                  label={message.model || 'Assistant'}
+                  onHeightChange={(element) => virtualizer.measureElement(element)}
+                />
+              ) : (
+                <MessageBubble
+                  message={message}
+                  availableModels={availableModels}
+                  isLastAssistantMessage={
+                    message.role === 'assistant' && virtualItem.index === lastAssistantMessageIndex
+                  }
+                  onRegenerate={onRegenerate}
+                  onEdit={
+                    message.role === 'user'
+                      ? (newContent) => onEditMessage?.(message.id, newContent)
+                      : undefined
+                  }
+                />
+              )}
             </div>
           );
         })}
