@@ -11,7 +11,8 @@ import { Markdown } from './Markdown';
 import type { Message, ModelSummary } from '../types';
 import { calculateCost, formatCost } from '../utils/tokenUtils';
 import { useToastStore } from '../store/toastStore';
-import { useStreamStore } from '../store/streamStore';
+import { useStore } from 'zustand';
+import { streamStore } from '../store/streamStore';
 import { StreamingMessage } from './StreamingMessage';
 
 /**
@@ -320,7 +321,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
-  const streamingMessageId = useStreamStore((state) =>
+  const streamingMessageId = useStore(streamStore, (state) =>
     state.isStreaming ? state.activeMessageId : null
   );
 

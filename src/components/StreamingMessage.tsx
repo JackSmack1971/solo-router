@@ -7,7 +7,7 @@
 import React, { useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { useStreamStore } from '../store/streamStore';
+import { streamStore } from '../store/streamStore';
 
 marked.setOptions({
   breaks: true,
@@ -90,7 +90,7 @@ export const StreamingMessage: React.FC<StreamingMessageProps> = ({
       }, MARKDOWN_THROTTLE_MS);
     };
 
-    const unsubscribe = useStreamStore.subscribe((state) => {
+    const unsubscribe = streamStore.subscribe((state) => {
       if (state.activeMessageId !== messageId) {
         return;
       }
@@ -99,7 +99,7 @@ export const StreamingMessage: React.FC<StreamingMessageProps> = ({
     });
 
     // Render any existing stream value immediately on mount
-    const snapshot = useStreamStore.getState();
+    const snapshot = streamStore.getState();
     if (snapshot.activeMessageId === messageId && snapshot.currentStream) {
       renderMarkdown(snapshot.currentStream);
     }
