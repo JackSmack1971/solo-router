@@ -13,6 +13,7 @@ import {
   formatCost,
   formatPricing,
   isNearContextLimit,
+  pruneMessagesToFitContext,
 } from '../tokenUtils';
 import type { Message, ModelSummary } from '../../types';
 
@@ -454,6 +455,59 @@ describe('Token Utils', () => {
     it('should handle zero tokens', () => {
       const result = isNearContextLimit(0, 10000, 0.9);
       expect(result).toBe(false);
+    });
+  });
+
+  describe('pruneMessagesToFitContext', () => {
+    const createMsg = (role: 'user' | 'assistant' | 'system', content: string) => ({
+      role,
+      content,
+    });
+
+    it('should return original messages when context length is undefined', () => {
+      const messages = [createMsg('user', 'Hello'), createMsg('assistant', 'Hi there')];
+
+      const result = pruneMessagesToFitContext(messages, undefined);
+
+      expect(result).toEqual(messages);
+    });
+
+    it('should keep most recent messages within context budget', () => {
+      const messages = [
+        createMsg('user', 'Hello'), // cost: 1 token + 4 overhead = 5
+        createMsg('assistant', 'Hi there'), // cost: ceil(8/4)=2 + 4 = 6
+        createMsg('user', 'How are you?'), // cost: ceil(12/4)=3 + 4 = 7
+      ];
+
+      const result = pruneMessagesToFitContext(messages, 19); // 19 - api overhead 3 = 16 budget
+
+      // Should include the two most recent messages (cost 6 + 7 = 13 <= 16), oldest pruned
+      expect(result).toEqual([messages[1], messages[2]]);
+    });
+
+    it('should always retain system prompt when present', () => {
+      const messages = [
+        createMsg('system', 'System context'), // cost: ceil(14/4)=4 + 4 = 8
+        createMsg('user', 'Hello'),
+        createMsg('assistant', 'Response that is too long to fit in remaining budget'),
+      ];
+
+      const result = pruneMessagesToFitContext(messages, 11); // 11 - api overhead 3 - system 8 = 0 budget
+
+      expect(result).toEqual([messages[0]]);
+    });
+
+    it('should skip messages that individually exceed the remaining budget', () => {
+      const messages = [
+        createMsg('user', 'Short'), // cost: ceil(5/4)=2 + 4 = 6
+        createMsg('assistant', 'This message is intentionally very long to exceed the budget'), // cost: ceil(65/4)=17 + 4 = 21
+        createMsg('user', 'Another short one'), // cost: ceil(18/4)=5 + 4 = 9
+      ];
+
+      const result = pruneMessagesToFitContext(messages, 18); // 18 - api overhead 3 = 15 budget
+
+      // Long message should be skipped, leaving only short messages that fit budget (6 + 9 = 15)
+      expect(result).toEqual([messages[0], messages[2]]);
     });
   });
 });
