@@ -8,15 +8,15 @@ A **local-first**, **privacy-focused** chat interface for Large Language Models 
 
 ## 📖 Table of Contents
 
-  - [Overview](https://www.google.com/search?q=%23overview)
-  - [Key Features](https://www.google.com/search?q=%23key-features)
-  - [Architecture](https://www.google.com/search?q=%23architecture)
-  - [Technology Stack](https://www.google.com/search?q=%23technology-stack)
-  - [Getting Started](https://www.google.com/search?q=%23getting-started)
-  - [Configuration](https://www.google.com/search?q=%23configuration)
-  - [Development](https://www.google.com/search?q=%23development)
-  - [Project Structure](https://www.google.com/search?q=%23project-structure)
-  - [License](https://www.google.com/search?q=%23license)
+  - [Overview](#overview)
+  - [Key Features](#key-features)
+  - [Architecture](#architecture)
+  - [Technology Stack](#technology-stack)
+  - [Getting Started](#getting-started)
+  - [Configuration](#configuration)
+  - [Development](#development)
+  - [Project Structure](#project-structure)
+  - [License](#license)
 
 -----
 
@@ -239,4 +239,4 @@ This project is licensed under the MIT License.
 
 Copyright (c) 2025 JackSmack1971.
 
-See the [LICENSE](https://www.google.com/search?q=LICENSE) file for details.
+See the [LICENSE](LICENSE) file for details.
