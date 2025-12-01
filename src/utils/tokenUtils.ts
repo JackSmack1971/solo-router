@@ -130,57 +130,6 @@ export function estimateConversationTokens(
 }
 
 /**
- * Prune messages to fit within a model's context window, preserving the most recent history.
- * The system prompt (first message with role 'system') is always retained when present.
- *
- * @param messages - Array of messages in API format
- * @param contextLength - Optional model context length; if undefined, no pruning occurs
- * @returns Messages trimmed to fit within the provided context length
- */
-export function pruneMessagesToFitContext(
-  messages: Array<{ role: string; content: string }>,
-  contextLength?: number
-): Array<{ role: string; content: string }> {
-  if (!contextLength) {
-    return messages;
-  }
-
-  const overheadPerMessage = 4;
-  const apiOverhead = 3;
-  const systemMessage = messages[0]?.role === 'system' ? messages[0] : null;
-  const remainingMessages = systemMessage ? messages.slice(1) : messages.slice();
-
-  const systemTokens = systemMessage
-    ? estimateTokenCount(systemMessage.content) + overheadPerMessage
-    : 0;
-  let remainingBudget = contextLength - apiOverhead - systemTokens;
-
-  if (remainingBudget <= 0) {
-    return systemMessage ? [systemMessage] : [];
-  }
-
-  const selectedMessages: Array<{ role: string; content: string }> = [];
-
-  for (let index = remainingMessages.length - 1; index >= 0; index -= 1) {
-    const message = remainingMessages[index];
-    const messageCost = estimateTokenCount(message.content) + overheadPerMessage;
-
-    if (messageCost > remainingBudget) {
-      continue;
-    }
-
-    remainingBudget -= messageCost;
-    selectedMessages.unshift(message);
-  }
-
-  if (systemMessage) {
-    selectedMessages.unshift(systemMessage);
-  }
-
-  return selectedMessages;
-}
-
-/**
  * Check if estimated tokens exceed a percentage of the model's context window
  *
  * @param estimatedTokens - Estimated token count
@@ -194,6 +143,78 @@ export function isNearContextLimit(
   threshold: number = 0.9
 ): boolean {
   return estimatedTokens > modelContextLength * threshold;
+}
+
+/**
+ * Prune messages to fit within the model's context limit using a sliding window.
+ * ALWAYS preserves the System Prompt (if present).
+ * ALWAYS preserves the last user message (to avoid empty requests).
+ *
+ * @param messages - The history of messages
+ * @param contextLimit - The maximum tokens allowed by the model
+ * @param threshold - Safety buffer (default 0.9)
+ * @returns Array of messages that fits the limit
+ */
+export function pruneMessagesToFitContext(
+  messages: Message[],
+  contextLimit: number,
+  threshold: number = 0.9
+): Message[] {
+  const safeLimit = contextLimit * threshold;
+
+  // 1. Estimate current tokens
+  // (We map to the simpler format expected by estimateConversationTokens)
+  let currentTokens = estimateConversationTokens(
+    messages.map((m) => ({ role: m.role, content: m.content }))
+  );
+
+  if (currentTokens <= safeLimit) {
+    return messages;
+  }
+
+  // 2. Identify strictly preserved messages
+  const systemMessage = messages.find((m) => m.role === 'system');
+  const lastMessage = messages[messages.length - 1];
+
+  // If we only have system + last message (or fewer), we can't prune further without breaking the app
+  if (messages.length <= 2) {
+    return messages;
+  }
+
+  // 3. Create a working list excluding preserved ones for pruning consideration
+  // We'll keep the system message at the start if it exists
+  const preservedMessages = [
+    ...(systemMessage ? [systemMessage] : []),
+    lastMessage,
+  ];
+
+  // Candidates for removal are everything in between
+  // (Filter out the exact instances we already preserved)
+  let candidates = messages.filter((m) => m !== systemMessage && m !== lastMessage);
+
+  // 4. Prune from the beginning of candidates (oldest messages)
+  // Re-calculate total with the proposed set
+  while (candidates.length > 0) {
+    const proposedMessages = [
+      ...(systemMessage ? [systemMessage] : []),
+      ...candidates,
+      lastMessage,
+    ];
+
+    const estimated = estimateConversationTokens(
+      proposedMessages.map((m) => ({ role: m.role, content: m.content }))
+    );
+
+    if (estimated <= safeLimit) {
+      return proposedMessages.sort((a, b) => a.timestamp - b.timestamp);
+    }
+
+    // Remove the oldest candidate
+    candidates.shift();
+  }
+
+  // Fallback: Return just the preserved messages (System + Last User Message)
+  return preservedMessages;
 }
 
 /**
