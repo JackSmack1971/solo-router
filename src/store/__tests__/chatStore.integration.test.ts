@@ -11,9 +11,9 @@ const mockStreamActions = {
 };
 
 const mockStreamState = {
-  currentStream: 'Hello',
-  isStreaming: true,
-  activeMessageId: 'assistant-message',
+  currentStream: '',
+  isStreaming: false,
+  activeMessageId: null as string | null,
   streamActions: mockStreamActions,
 };
 
@@ -38,6 +38,9 @@ describe('ChatStore integration with streamStore', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStreamState.currentStream = '';
+    mockStreamState.isStreaming = false;
+    mockStreamState.activeMessageId = null;
     localStorage.clear();
     sessionStorage.clear();
 
