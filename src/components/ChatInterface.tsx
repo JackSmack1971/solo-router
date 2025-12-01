@@ -38,6 +38,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   const clearError = useChatStore((state) => state.clearError);
   const availableModels = useChatStore((state) => state.availableModels);
   const lastSaved = useChatStore((state) => state.lastSaved);
+  const createConversation = useChatStore((state) => state.createConversation);
   const [optimisticMessages, addOptimisticMessage] = useOptimistic(
     activeConversation?.messages ?? [],
     (state: Message[], message: Message) => [...state, message]
@@ -198,11 +199,33 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({ onOpenSettings }) 
   // Show placeholder if no active conversation
   if (!activeConversation) {
     return (
-      <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400">
-        <div className="text-center">
-          <div className="text-6xl mb-4">👋</div>
-          <h2 className="text-xl font-semibold">Welcome to SoloRouter Chat</h2>
-          <p className="mt-2 text-sm">Create a new conversation to get started</p>
+      <div className="flex items-center justify-center h-full bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-200 px-4">
+        <div className="text-center max-w-md space-y-4 sm:space-y-6">
+          <div className="text-5xl sm:text-6xl">👋</div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">Welcome to SoloRouter Chat</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              You&apos;ll need to add an API key in Settings before starting a new conversation.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
+            <button
+              onClick={() => createConversation()}
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-900 transition-colors font-medium"
+            >
+              New Chat
+            </button>
+            <button
+              onClick={onOpenSettings}
+              disabled={!onOpenSettings}
+              className="px-4 py-2.5 bg-gray-900 text-white dark:bg-gray-700 dark:text-gray-50 hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-60 disabled:cursor-not-allowed rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 focus:ring-offset-gray-50 dark:focus:ring-offset-gray-900 transition-colors font-medium"
+            >
+              Open Settings
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Tip: Set your API key to unlock chat responses. You can start a new chat anytime.
+          </p>
         </div>
       </div>
     );
