@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useChatStore } from '../chatStore';
+import { useChatStore, type ChatStore } from '../chatStore';
 import * as openRouterModule from '../../services/openRouter';
 import type { StreamParams } from '../../types';
 
@@ -21,7 +21,7 @@ vi.mock('../../services/openRouter', () => ({
 describe('ChatStore - Concurrency and Race Conditions', () => {
   beforeEach(() => {
     // Reset store to initial state
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
     act(() => {
       result.current.clearAllData();
     });
@@ -39,7 +39,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should handle rapid conversation switching during streaming', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     // Create two conversations
     let conv1Id: string = '';
@@ -108,7 +108,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should abort stream when switching conversations and starting new stream', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     // Create two conversations
     let conv1Id: string = '';
@@ -176,7 +176,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should handle concurrent message additions to different conversations', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     // Create three conversations
     let conv1Id: string = '';
@@ -220,7 +220,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should maintain correct active conversation during rapid switching', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     // Create 5 conversations
     const convIds: string[] = [];
@@ -253,7 +253,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should handle rapid updates to same message during streaming', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     act(() => {
       result.current.createConversation('Test');
@@ -280,7 +280,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should handle race condition between message update and conversation switch', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     let conv1Id: string = '';
     let conv2Id: string = '';
@@ -339,7 +339,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should handle concurrent updates to conversation metadata', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     let convId: string = '';
 
@@ -364,7 +364,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should track performance of rapid conversation switching', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     // Create 10 conversations
     const convIds: string[] = [];
@@ -397,7 +397,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should handle concurrent message deletions during streaming', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     act(() => {
       result.current.createConversation('Test');
@@ -444,7 +444,7 @@ describe('ChatStore - Concurrency and Race Conditions', () => {
   });
 
   it('should handle stress test of rapid operations', async () => {
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
     const startTime = performance.now();
 

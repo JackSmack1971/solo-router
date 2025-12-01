@@ -25,7 +25,7 @@ import { streamStore } from './streamStore';
 /**
  * Chat store state interface
  */
-interface ChatStore {
+export interface ChatStore {
   // State
   conversations: Conversation[];
   activeConversationId: string | null;

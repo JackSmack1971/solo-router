@@ -6,7 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useChatStore } from '../chatStore';
+import { useChatStore, type ChatStore } from '../chatStore';
 import * as openRouterModule from '../../services/openRouter';
 import type { StreamParams } from '../../types';
 
@@ -21,7 +21,7 @@ vi.mock('../../services/openRouter', () => ({
 describe('ChatStore - Streaming Logic (AT-005)', () => {
   beforeEach(() => {
     // Reset store to initial state before each test
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
     act(() => {
       result.current.clearAllData();
     });
@@ -40,7 +40,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
 
   describe('sendMessage - isGenerating flag', () => {
     it('should set isGenerating to true when starting generation', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       // Create a conversation first
       act(() => {
@@ -66,7 +66,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should set isGenerating to false when generation completes', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       // Create a conversation
       act(() => {
@@ -90,7 +90,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should set isGenerating to false when generation errors', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       // Create a conversation
       act(() => {
@@ -115,7 +115,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
 
   describe('sendMessage - message appending via onChunk', () => {
     it('should append chunks to assistant message progressively', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       // Create a conversation
       act(() => {
@@ -152,7 +152,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should add user message before starting stream', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -176,7 +176,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should create assistant message placeholder before streaming', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -203,7 +203,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
 
   describe('sendMessage - currentAbortController management', () => {
     it('should create AbortController when starting generation', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -228,7 +228,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should clear AbortController when generation completes', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -250,7 +250,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should pass abort signal to streamChat', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -277,7 +277,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
 
   describe('sendMessage - error handling', () => {
     it('should handle errors and set error state', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -299,7 +299,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should not send message when no active conversation', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       // No conversation created
       const streamChatMock = vi.mocked(openRouterModule.defaultProvider.streamChat);
@@ -322,7 +322,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
 
   describe('stopGeneration', () => {
     it('should abort the current request', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -357,7 +357,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should reset isGenerating flag', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -386,7 +386,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should clear currentAbortController', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -415,7 +415,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should do nothing if no generation is in progress', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       // No generation started
       expect(result.current.currentAbortController).toBeNull();
@@ -434,7 +434,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
 
   describe('sendMessage - token usage tracking', () => {
     it('should update message with token count from onDone', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
@@ -462,7 +462,7 @@ describe('ChatStore - Streaming Logic (AT-005)', () => {
     });
 
     it('should update conversation metadata with total tokens', async () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('Test');
