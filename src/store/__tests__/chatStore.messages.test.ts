@@ -6,12 +6,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useChatStore } from '../chatStore';
+import { useChatStore, type ChatStore } from '../chatStore';
 
 describe('ChatStore - Message CRUD (AT-004)', () => {
   beforeEach(() => {
     // Reset store to initial state before each test
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
     act(() => {
       result.current.clearAllData();
     });
@@ -23,7 +23,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
 
   describe('addMessage', () => {
     it('should add message with generated ID and timestamp', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -52,7 +52,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should update conversation updatedAt timestamp', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -79,7 +79,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should update conversation metadata messageCount', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -111,7 +111,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should auto-generate conversation title from first user message', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -132,7 +132,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should truncate long first messages for title', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -154,7 +154,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should not change title if conversation already has a custom title', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -175,7 +175,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
 
   describe('updateMessage', () => {
     it('should update message content', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       let messageId: string = '';
@@ -202,7 +202,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should update conversation updatedAt timestamp', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       let messageId: string = '';
@@ -233,7 +233,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should not affect other messages in the conversation', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       let messageId: string = '';
@@ -265,7 +265,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
 
   describe('deleteMessage', () => {
     it('should remove message from conversation', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       let messageId: string = '';
@@ -297,7 +297,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should update conversation metadata messageCount', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       let messageId: string = '';
@@ -328,7 +328,7 @@ describe('ChatStore - Message CRUD (AT-004)', () => {
     });
 
     it('should update conversation updatedAt timestamp', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       let messageId: string = '';

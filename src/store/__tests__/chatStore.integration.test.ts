@@ -1,6 +1,6 @@
 import { act, renderHook, type RenderHookResult } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useChatStore } from '../chatStore';
+import { useChatStore, type ChatStore } from '../chatStore';
 import * as openRouterModule from '../../services/openRouter';
 import type { StreamParams } from '../../types';
 
@@ -34,7 +34,7 @@ vi.mock('../../services/openRouter', () => ({
 }));
 
 describe('ChatStore integration with streamStore', () => {
-  let hook: RenderHookResult<ReturnType<typeof useChatStore>, undefined>;
+  let hook: RenderHookResult<ChatStore, undefined>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -44,7 +44,7 @@ describe('ChatStore integration with streamStore', () => {
     localStorage.clear();
     sessionStorage.clear();
 
-    hook = renderHook<ReturnType<typeof useChatStore>, undefined>(() => useChatStore());
+    hook = renderHook<ChatStore, undefined>(() => useChatStore());
     act(() => {
       hook.result.current.clearAllData();
     });

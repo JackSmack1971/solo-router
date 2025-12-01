@@ -6,12 +6,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useChatStore } from '../chatStore';
+import { useChatStore, type ChatStore } from '../chatStore';
 
 describe('ChatStore - Conversation CRUD (AT-003)', () => {
   beforeEach(() => {
     // Reset store to initial state before each test
-    const { result } = renderHook(() => useChatStore());
+    const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
     act(() => {
       result.current.clearAllData();
     });
@@ -23,7 +23,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
 
   describe('createConversation', () => {
     it('should create a conversation with default title', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let conversationId: string = '';
       act(() => {
@@ -37,7 +37,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should create a conversation with custom title', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       act(() => {
         result.current.createConversation('My Custom Title');
@@ -48,7 +48,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should set newly created conversation as active', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let conversationId: string = '';
       act(() => {
@@ -59,7 +59,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should add conversation to the beginning of the list', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let firstId: string = '';
       let secondId: string = '';
@@ -78,7 +78,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should initialize conversation with timestamps', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       const beforeCreate = Date.now();
 
@@ -97,7 +97,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
 
   describe('setActiveConversation', () => {
     it('should set active conversation ID when conversation exists', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -113,7 +113,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should not change active ID when conversation does not exist', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let existingId: string = '';
       act(() => {
@@ -137,7 +137,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should not modify the conversations list', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let conv1Id: string = '';
 
@@ -158,7 +158,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
 
   describe('renameConversation', () => {
     it('should update conversation title', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -174,7 +174,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should update the updatedAt timestamp', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -200,7 +200,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
 
   describe('deleteConversation', () => {
     it('should remove conversation from the list', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -219,7 +219,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should set new active conversation when deleting the active one', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let firstId: string = '';
       let secondId: string = '';
@@ -241,7 +241,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should set active to null when deleting the last conversation', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -257,7 +257,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should not change active ID when deleting a non-active conversation', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let firstId: string = '';
       let secondId: string = '';
@@ -281,7 +281,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
 
   describe('getActiveConversation', () => {
     it('should return the active conversation', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       let convId: string = '';
       act(() => {
@@ -297,7 +297,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should return null when no conversation is active', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       const active = result.current.getActiveConversation();
 
@@ -305,7 +305,7 @@ describe('ChatStore - Conversation CRUD (AT-003)', () => {
     });
 
     it('should return null when active ID points to non-existent conversation', () => {
-      const { result } = renderHook(() => useChatStore());
+      const { result } = renderHook<ChatStore, unknown>(() => useChatStore());
 
       // Manually set an invalid active ID
       act(() => {
